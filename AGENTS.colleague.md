@@ -1,9 +1,9 @@
 # Colleague Resident — `innereye`
 
-You are a colleague session working in a clone of this template — reading
-this file because colleague's prompt cascade resolves it here, not because
+You are a colleague session working in a clone of `innereye` — reading this
+file because colleague's prompt cascade resolves it here, not because
 `culture.yaml` selected you. That declaration says `backend: claude`, so
-`CLAUDE.md` is this template's *mesh resident* prompt; colleague remains fully
+`CLAUDE.md` is this repo's *mesh resident* prompt; colleague remains fully
 usable interactively over the same clone, and this file is what it loads when
 you run it. A clone that declares `backend: colleague` promotes this file to
 its resident prompt as well — the guidance below holds either way.
@@ -31,13 +31,36 @@ update this section so the docs keep matching what's actually on disk.
 
 ## What this project is
 
-`innereye` is a clonable template for AgentCulture mesh agents —
-an agent-first CLI, a mesh identity, the canonical skill kit, and a
-buildable/deployable package baseline. `CLAUDE.md` in this repo is written for
-a Claude Code session working *on* the repo — it is not your runtime prompt,
-but it is the fullest write-up of the repo's conventions if you need more
-context than fits here (worktree layout, memory discipline, `ask-colleague`
-usage, the full skill kit list).
+`innereye` is the AgentCulture mesh's **visual output surface**: an agent-first
+CLI that renders and previews images and videos from **text, image, or
+embedding** inputs, starting with a ComfyUI backend but not locked to it.
+
+**The domain is not implemented yet.** On disk today there is only the
+`culture-agent-template` scaffold — the six agent-first verbs, four harness
+prompt files, the vendored skill kit, and CI. No `render` verb, no backend
+adapter, no job store. The intended design is in
+[issue #1](https://github.com/agentculture/innereye/issues/1) and `CLAUDE.md`.
+
+`CLAUDE.md` is written for a Claude Code session working *on* the repo — it is
+not your runtime prompt, but it is the fullest write-up of both the domain
+design and the repo's conventions if you need more context than fits here.
+
+## Domain rules you must not quietly break
+
+If a delegated task touches generation, these positions are load-bearing:
+
+- **Never silently downgrade a request.** If the selected backend cannot do what
+  a recipe asks (an embedding input, a video task), fail with a message naming a
+  backend that could. Approximating an embedding as "the closest text prompt"
+  and generating anyway is the worst available behaviour — the caller cannot
+  tell from the output.
+- **Recipes are backend-independent.** `(task, inputs, params)` compiled by each
+  adapter; do not leak ComfyUI graph shape into the CLI surface.
+- **Provenance travels with the artifact** — backend, model, seed, resolution,
+  sampler/steps, the recipe. Never let a seed go unrecorded.
+- **Generation is a job**, not a blocking call, and job state survives process
+  exit.
+- **Write verbs are dry-run by default; `--apply` commits.**
 
 ## How you work
 

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-09-16
+
+### Added
+
+- **`CLAUDE.md` re-initialized from the seed placeholder into a full runtime prompt** for innereye's actual domain, per the build brief in [issue #1](https://github.com/agentculture/innereye/issues/1): the three inputs (text / image / **embedding**), the backend-independent `(task, inputs, params)` recipe that each adapter compiles, mandatory capability negotiation with honest failure, jobs-not-blocking-calls, provenance-as-output, the preview problem, the non-goals, and the dry-run-by-default rule for write verbs.
+- A **Status: scaffold** section in `CLAUDE.md` and `README.md` stating plainly that no generation feature exists on disk yet (no `render` verb, no backend adapter, no job store), so prose cannot drift ahead of code unnoticed.
+- A positioning note distinguishing this project from the archived Microsoft Research *InnerEye* medical-imaging effort.
+- A documented `git grep -nF 'visual output surface'` sweep — the "what innereye is" claim lives in four harness prompt files, `README.md`, `pyproject.toml`, and three code strings, and nothing in CI checks that they agree.
+
+### Changed
+
+- `README.md` rewritten around the domain — three inputs, design commitments, non-goals — replacing the template-era "Make it your own" rename instructions with a Contributing section.
+- `AGENTS.override.md`, `AGENTS.colleague.md` and `QWEN.md` retargeted from "a clonable template for AgentCulture mesh agents" to innereye's real domain. The colleague and Qwen files now carry the load-bearing domain rules (never silently downgrade, recipes stay backend-independent, provenance travels with the artifact, generation is a job, write verbs are dry-run by default) so a non-Claude harness cannot break them unknowingly.
+- CLI self-description updated to match: the parser `description`, `learn`'s text + JSON payload (now with a `status` field), and `explain`'s root catalog entry. The rubric gate (`teken cli doctor . --strict`) still passes.
+
 ## [0.9.0] - 2026-09-06
 
 ### Added

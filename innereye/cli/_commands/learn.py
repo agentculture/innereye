@@ -12,14 +12,21 @@ from innereye import __version__
 from innereye.cli._output import emit_result
 
 _TEXT = """\
-innereye — a clonable template for AgentCulture mesh agents.
+innereye — the mesh's visual output surface.
 
 Purpose
 -------
-Scaffold for a new Culture mesh agent: an agent-first CLI (cited from the teken
-`python-cli` reference), an identity (culture.yaml + CLAUDE.md), the canonical
-guildmaster skill kit under .claude/skills/, and a deploy/CI baseline. Clone it,
-rename the package, and edit culture.yaml to mint a new agent.
+Render and preview images and videos from text, image, or embedding inputs.
+Generation backends are pluggable behind one agent-first CLI: a portable
+(task, inputs, params) recipe is compiled by each adapter into its native form,
+starting with ComfyUI. An adapter declares the tasks and input modalities it
+supports; an unsupported request fails honestly naming a backend that can,
+never silently downgrading. Generation is modelled as jobs, and provenance
+(backend, model, seed, params, recipe) travels with every artifact.
+
+STATUS: scaffold. No generation verb is implemented yet — the commands below
+are the agent-first baseline only. See:
+https://github.com/agentculture/innereye/issues/1
 
 Commands
 --------
@@ -52,7 +59,11 @@ def _as_json_payload() -> dict[str, object]:
     return {
         "tool": "innereye",
         "version": __version__,
-        "purpose": "Clonable scaffold for a new AgentCulture mesh agent.",
+        "purpose": (
+            "Render and preview images and videos from text, image, or embedding "
+            "inputs, via pluggable generation backends (ComfyUI first)."
+        ),
+        "status": "scaffold: no generation verb implemented yet",
         "commands": [
             {"path": ["whoami"], "summary": "Identity probe from culture.yaml."},
             {"path": ["learn"], "summary": "Self-teaching prompt."},

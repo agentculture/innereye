@@ -9,18 +9,50 @@ Qwen Code session.
 
 ## What this project is
 
-`innereye` is a **clonable template for AgentCulture mesh agents**.
-It is a working, minimal example of the sibling pattern every Culture agent
-follows: an agent-first CLI, a mesh identity, the canonical skill kit, and a
-buildable/deployable package baseline. Clone it, rename the package, edit
-`culture.yaml`, and you have a new agent that `steward doctor` recognizes.
+`innereye` is the AgentCulture mesh's **visual output surface**: an agent-first
+CLI that renders and previews images and videos from **text, image, or
+embedding** inputs. It starts with a ComfyUI backend but is not locked to one —
+generation backends are pluggable behind a portable `(task, inputs, params)`
+**recipe** that each adapter compiles into its native form (a filled ComfyUI
+template graph; a single HTTP request for a hosted API).
+
+**Status: scaffold.** The domain is not implemented yet. On disk today there is
+only the `culture-agent-template` baseline — the six agent-first verbs, four
+harness prompt files, the vendored skill kit, and CI. There is no `render`
+verb, no backend adapter, and no job store. The intended design lives in
+[issue #1](https://github.com/agentculture/innereye/issues/1) and
+[`CLAUDE.md`](CLAUDE.md).
 
 It is a sibling to [`guildmaster`](https://github.com/agentculture/guildmaster)
 (the **skills supplier**), [`steward`](https://github.com/agentculture/steward)
 (**alignment** — `steward doctor`, the sibling-pattern baseline), and
 [`teken`](https://github.com/agentculture/teken) (the **afi-cli** "Agent First
 Interface" scaffolder this CLI is cited from) within the Organic Development
-framework.
+framework. Vectors come from
+[`embeddings-cli`](https://github.com/agentculture/embeddings-cli); shareable
+previews hand off to
+[`storybook-cli`](https://github.com/agentculture/storybook-cli).
+
+## Domain rules that shape every verb
+
+- **The three inputs** — text, images (init/mask/control/reference), and
+  **embeddings**. Embeddings are first-class: an agent holding a CLIP vector, a
+  latent or an IP-Adapter embedding conditions generation on it directly,
+  without round-tripping through English.
+- **Capability negotiation is mandatory.** Each adapter declares the tasks and
+  modalities it supports; an unsupported request **fails honestly**, naming a
+  backend that could do it. Never silently downgrade — approximating an
+  embedding as text and generating anyway is indistinguishable in the output.
+- **Generation is modelled as jobs** (submit / status / fetch, blocking wait as
+  a convenience), and job state survives process exit.
+- **Provenance is output**: backend, model, seed, resolution, sampler/steps, the
+  full recipe, the exact graph where applicable — beside the artifact. Seeds are
+  captured explicitly, never left to a backend default.
+- **Write verbs are dry-run by default; `--apply` commits.** A dry run prints
+  the compiled recipe and the resolved backend.
+- **Non-goals:** not image *understanding* (that is `embeddings-lens` and
+  peers), not a model zoo/trainer, not a ComfyUI reimplementation, not a hosting
+  service.
 
 ## Prompt files by harness
 
@@ -52,27 +84,21 @@ requires nor changes that declaration. The declaration and the resident prompt
 together satisfy the two invariants `steward doctor` verifies:
 **prompt-file-present** and **backend-consistency** (`claude` ↔ `CLAUDE.md`).
 
-## Cloning this template (re-initialization)
+## Keeping the docs honest
 
-When you start a new agent from this template:
+The claim of *what innereye is* is repeated in four harness prompt files,
+`README.md`, `pyproject.toml`'s `description`, and three code strings
+(`innereye/cli/__init__.py`'s parser description, `_commands/learn.py`'s `_TEXT`
+and `_as_json_payload()`, and `explain/catalog.py`'s `_ROOT`). Nothing in CI
+checks that they still agree — when the description changes, sweep them
+together:
 
-1. Rename the package directory `innereye/` → `<your_module>/`
-   and replace `innereye` (module) / `innereye`
-   (CLI and dist name) throughout `pyproject.toml`, the package, `tests/`,
-   `sonar-project.properties`, and `README.md`. The name is hard-coded in
-   ~100 places, so list every occurrence first rather than renaming by hand
-   (`git grep` is portable and skips `.git` / untracked `__pycache__`):
+```bash
+git grep -niF 'visual output surface'
+```
 
-   ```bash
-   git grep -nF -e 'innereye' -e 'innereye'
-   ```
-
-2. Set your `suffix` (and `backend`) in `culture.yaml`. `whoami` and `doctor`
-   then reflect the new identity with no further code change.
-3. Rewrite `CLAUDE.md` (and this file, and the other two harness files) to
-   describe your agent.
-4. Re-vendor the skill kit you need from guildmaster (see
-   `docs/skill-sources.md`) — keep only the skills your agent uses.
+Identity itself needs no code change: `whoami` and `doctor` read `suffix` and
+`backend` from `culture.yaml` at runtime.
 
 ## The CLI
 

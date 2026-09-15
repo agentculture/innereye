@@ -71,7 +71,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser = _CliArgumentParser(
         prog="innereye",
-        description="innereye — a clonable template for AgentCulture mesh agents.",
+        description=(
+            "innereye — visual output surface: render and preview images and "
+            "videos from text, image, or embedding inputs."
+        ),
     )
     parser.add_argument(
         "--version",

@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-09-16
+
+### Fixed
+
+- **`/remember` was documented as private-by-default; it is public-by-default.** `remember.sh` injects `--visibility public` once it resolves the `culture.yaml` suffix (an explicit policy override in the script), so a plain `/remember` writes to the tracked, committed `<repo-root>/.eidetic/memory` — not `$HOME`. `CLAUDE.md` said the opposite while instructing sessions to capture memories as they happen, which would have committed session-derived records to a public repo. Corrected, with `--visibility private` now required for session-derived captures and a note that flagless `/recall` cannot see private records. (Qodo review, PR #2.)
+- **TestPyPI on PRs is a real upload, not a dry run.** `publish.yml`'s `test-publish` job rewrites the version to `<version>.dev<run_number>` and runs `uv publish` against TestPyPI; `CLAUDE.md` and `QWEN.md` both called it a dry-run. Corrected in both, with the note that an index upload cannot be re-uploaded under the same version. (Qodo review, PR #2.)
+- **Cross-repo issue posting now requires approval first.** `communicate`'s `post-issue.sh` is a thin wrapper over `agtag issue post` with no preview or confirmation gate, so the previous unqualified "file an issue on the sibling" instruction authorized an immediate outward-facing publish under this agent's identity. Draft, show, then post. (Qodo review, PR #2.)
+- **The deploy prerequisite was stale.** `CLAUDE.md` repeated issue #1's claim that a PyPI/TestPyPI Trusted Publisher still needs registering. Both indexes already publish — PyPI carries `innereye` 0.9.0 from the scaffold merge — so the claim is replaced with a verification command.
+
+## [0.10.0] - 2026-09-16
+
+### Added
+
+- **`CLAUDE.md` re-initialized from the seed placeholder into a full runtime prompt** for innereye's actual domain, per the build brief in [issue #1](https://github.com/agentculture/innereye/issues/1): the three inputs (text / image / **embedding**), the backend-independent `(task, inputs, params)` recipe that each adapter compiles, mandatory capability negotiation with honest failure, jobs-not-blocking-calls, provenance-as-output, the preview problem, the non-goals, and the dry-run-by-default rule for write verbs.
+- A **Status: scaffold** section in `CLAUDE.md` and `README.md` stating plainly that no generation feature exists on disk yet (no `render` verb, no backend adapter, no job store), so prose cannot drift ahead of code unnoticed.
+- A positioning note distinguishing this project from the archived Microsoft Research *InnerEye* medical-imaging effort.
+- A documented `git grep -nF 'visual output surface'` sweep — the "what innereye is" claim lives in four harness prompt files, `README.md`, `pyproject.toml`, and three code strings, and nothing in CI checks that they agree.
+
+### Changed
+
+- `README.md` rewritten around the domain — three inputs, design commitments, non-goals — replacing the template-era "Make it your own" rename instructions with a Contributing section.
+- `AGENTS.override.md`, `AGENTS.colleague.md` and `QWEN.md` retargeted from "a clonable template for AgentCulture mesh agents" to innereye's real domain. The colleague and Qwen files now carry the load-bearing domain rules (never silently downgrade, recipes stay backend-independent, provenance travels with the artifact, generation is a job, write verbs are dry-run by default) so a non-Claude harness cannot break them unknowingly.
+- CLI self-description updated to match: the parser `description`, `learn`'s text + JSON payload (now with a `status` field), and `explain`'s root catalog entry. The rubric gate (`teken cli doctor . --strict`) still passes.
+
 ## [0.9.0] - 2026-09-06
 
 ### Added

@@ -12,11 +12,25 @@ from __future__ import annotations
 _ROOT = """\
 # innereye
 
-A clonable template for AgentCulture mesh agents. It carries an agent-first CLI
-(cited from the teken `python-cli` reference), a mesh identity (`culture.yaml` +
-`CLAUDE.md`), the canonical guildmaster skill kit under `.claude/skills/`, and a
-buildable/deployable package baseline. Clone it, rename the package, edit
-`culture.yaml`, and you have a new agent.
+The AgentCulture mesh's **visual output surface**: render and preview images and
+videos from **text, image, or embedding** inputs. Generation backends are
+pluggable behind one agent-first CLI — a portable `(task, inputs, params)`
+recipe that each adapter compiles into its native form, starting with ComfyUI.
+
+Design commitments:
+
+- Embeddings are a first-class input, not an afterthought.
+- Adapters declare their capabilities; an unsupported request fails honestly
+  naming a backend that could serve it, and **never silently downgrades**.
+- Generation is modelled as jobs (submit / status / fetch); job state survives
+  process exit.
+- Provenance (backend, model, seed, resolution, sampler/steps, recipe) travels
+  with every artifact.
+- Write verbs are dry-run by default; `--apply` commits.
+
+**Status: scaffold.** No generation verb is implemented yet; the verbs below are
+the agent-first baseline. The design brief is
+<https://github.com/agentculture/innereye/issues/1>.
 
 ## Verbs
 

@@ -20,14 +20,28 @@ what the repo is and how it is laid out, not who is reading it.
 
 ## What this project is
 
-`innereye` is a clonable template for AgentCulture mesh agents —
-a working, minimal example of the sibling pattern every Culture agent follows:
-an agent-first CLI, a mesh identity, the canonical skill kit, and a
-buildable/deployable package baseline. It is a sibling to
-[`guildmaster`](https://github.com/agentculture/guildmaster) (the skills
-supplier), [`steward`](https://github.com/agentculture/steward) (alignment),
-and [`teken`](https://github.com/agentculture/teken) (the CLI scaffolder this
-package is cited from).
+`innereye` is the AgentCulture mesh's **visual output surface**: an agent-first
+CLI that renders and previews images and videos from **text, image, or
+embedding** inputs. It starts with a ComfyUI backend but is deliberately not
+locked to one — generation backends are pluggable behind a portable
+`(task, inputs, params)` "recipe" each adapter compiles into its native form.
+
+**Read this before answering a question about what innereye does:** the domain
+is *not implemented yet*. On disk today there is only the
+`culture-agent-template` scaffold — six agent-first verbs (`whoami`, `learn`,
+`explain`, `overview`, `doctor`, `cli overview`), four harness prompt files, the
+vendored skill kit, and CI. There is no `render` verb, no backend adapter, and
+no job store. The intended design lives in
+[issue #1](https://github.com/agentculture/innereye/issues/1) and
+[`CLAUDE.md`](CLAUDE.md); when you summarize it, say plainly that it is design,
+not shipped behaviour.
+
+It is a sibling to [`guildmaster`](https://github.com/agentculture/guildmaster)
+(the skills supplier), [`steward`](https://github.com/agentculture/steward)
+(alignment), and [`teken`](https://github.com/agentculture/teken) (the CLI
+scaffolder this package is cited from), and expects to exchange vectors with
+[`embeddings-cli`](https://github.com/agentculture/embeddings-cli) and previews
+with [`storybook-cli`](https://github.com/agentculture/storybook-cli).
 
 ## Four harnesses, four files, no shared base
 
@@ -57,15 +71,15 @@ agents:
   backend: claude
 ```
 
-This template's *mesh* resident runs on `backend: claude`, so `CLAUDE.md` is
+innereye's *mesh* resident runs on `backend: claude`, so `CLAUDE.md` is
 the live resident prompt. A Pi session working in a clone of this repo is a
 **local tool session**, not the mesh resident — it reads this file and
 `.pi/SYSTEM.md` regardless of what `culture.yaml` declares, and running `pi`
 here neither requires nor changes that declaration.
 
-(A clone that wants `associate` as its *mesh* resident declares
+(A repo that wants `associate` as its *mesh* resident declares
 `backend: colleague` with `model: associate` — see `docs/skill-sources.md`.
-That is a per-clone choice; this template does not ship it.)
+That is a per-repo choice; innereye does not use it.)
 
 ## Layout (what you can read/find/summarize here)
 
@@ -85,9 +99,11 @@ culture.yaml              mesh identity (suffix + backend)
 - The vendored skills under `.claude/skills/` are cited **verbatim** from
   guildmaster — never propose editing their scripts; the fix belongs upstream
   (`docs/skill-sources.md` has the re-sync procedure).
-- The package/CLI name (`innereye` / `innereye`)
-  is hard-coded in roughly a hundred places; a rename is a `git grep` sweep,
-  not a hand edit (see `CLAUDE.md`'s "Cloning this template" section).
+- The claim of *what innereye is* is repeated across four harness prompt
+  files, `README.md`, `pyproject.toml`, and three code strings
+  (`cli/__init__.py`, `_commands/learn.py`, `explain/catalog.py`). If you are
+  asked whether the docs agree, sweep them together:
+  `git grep -niF 'visual output surface'`.
 - Every PR bumps the version (`version-bump` skill); CI's `version-check` job
   blocks merge otherwise.
 - This file describes the repo **as it exists on disk today**. If you are

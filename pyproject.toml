@@ -1,6 +1,6 @@
 [project]
 name = "innereye"
-version = "0.10.0"
+version = "0.10.1"
 description = "Visual output surface for agents: render and preview images and videos from text, image, or embedding inputs. Starts with a ComfyUI backend but is not locked to it — pluggable generation backends behind one agent-first CLI."
 readme = "README.md"
 license = "Apache-2.0"

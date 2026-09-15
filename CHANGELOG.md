@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-09-16
+
+### Fixed
+
+- **`/remember` was documented as private-by-default; it is public-by-default.** `remember.sh` injects `--visibility public` once it resolves the `culture.yaml` suffix (an explicit policy override in the script), so a plain `/remember` writes to the tracked, committed `<repo-root>/.eidetic/memory` — not `$HOME`. `CLAUDE.md` said the opposite while instructing sessions to capture memories as they happen, which would have committed session-derived records to a public repo. Corrected, with `--visibility private` now required for session-derived captures and a note that flagless `/recall` cannot see private records. (Qodo review, PR #2.)
+- **TestPyPI on PRs is a real upload, not a dry run.** `publish.yml`'s `test-publish` job rewrites the version to `<version>.dev<run_number>` and runs `uv publish` against TestPyPI; `CLAUDE.md` and `QWEN.md` both called it a dry-run. Corrected in both, with the note that an index upload cannot be re-uploaded under the same version. (Qodo review, PR #2.)
+- **Cross-repo issue posting now requires approval first.** `communicate`'s `post-issue.sh` is a thin wrapper over `agtag issue post` with no preview or confirmation gate, so the previous unqualified "file an issue on the sibling" instruction authorized an immediate outward-facing publish under this agent's identity. Draft, show, then post. (Qodo review, PR #2.)
+- **The deploy prerequisite was stale.** `CLAUDE.md` repeated issue #1's claim that a PyPI/TestPyPI Trusted Publisher still needs registering. Both indexes already publish — PyPI carries `innereye` 0.9.0 from the scaffold merge — so the claim is replaced with a verification command.
+
 ## [0.10.0] - 2026-09-16
 
 ### Added

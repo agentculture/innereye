@@ -292,14 +292,29 @@ and make anything else configuration, not a constant.
 
 CI (`.github/workflows/tests.yml`) runs four jobs: `test` (pytest + SonarCloud),
 `lint` (the full set above), `harness-smoke` (all four harness configs), and
-`version-check`. `.github/workflows/publish.yml` publishes to PyPI via Trusted
-Publishing on push to `main` and does a TestPyPI dry-run on PRs — both
-path-filtered to `pyproject.toml` and `innereye/**`.
+`version-check`. `.github/workflows/publish.yml` is path-filtered to
+`pyproject.toml` and `innereye/**`, and **both of its publish paths really
+upload**:
 
-**Deploy prerequisite, still outstanding:** a **Trusted Publisher for the
-`innereye` project must be registered on PyPI *and* TestPyPI** (workflow
-`publish.yml`, environments `pypi` / `testpypi`) before a push to `main` first
-tries to publish. Guildmaster could not do this step; a human must.
+- **push to `main`** → builds and publishes the version in `pyproject.toml` to
+  **PyPI** via Trusted Publishing.
+- **same-repo pull request** → rewrites the version to
+  `<version>.dev<github.run_number>` and publishes that to **TestPyPI**
+  (`uv publish --publish-url https://test.pypi.org/legacy/`).
+
+The PR path is **not a dry run** — it is a real external upload of a real dev
+version, and a PyPI/TestPyPI upload cannot be deleted and re-uploaded under the
+same version. Fork PRs skip it (no OIDC context). Treat a version bump as
+spending a version number on both indexes, not just on `main`.
+
+**Deploy is already live** — do not repeat the brief's claim that Trusted
+Publisher registration is outstanding. It was true when issue #1 was written and
+is not true now: PyPI carries `innereye 0.9.0` (published by the scaffold merge)
+and TestPyPI carries the PR dev builds. Verify before asserting either way:
+
+```bash
+curl -s https://pypi.org/pypi/innereye/json | python3 -c "import sys,json;print(sorted(json.load(sys.stdin)['releases']))"
+```
 
 ## Conventions and workflow
 
@@ -331,17 +346,42 @@ tries to publish. Guildmaster could not do this step; a human must.
 - **Cross-repo work goes through issues, not edits.** The embeddings interchange
   format, a storybook handoff, a media-cli integration — file an issue on the
   sibling with the `communicate` skill rather than editing another repo.
+  **Get the user's approval on the target repo, title and body first.**
+  `communicate`'s `post-issue.sh` is a thin wrapper over `agtag issue post` with
+  no preview or confirmation step of its own — calling it publishes immediately,
+  under this agent's identity, to a repo whose maintainers did not ask for it.
+  Draft, show, then post.
 
 ### Memory discipline — recall before, remember after
 
-The `recall` / `remember` skills are backed by the `eidetic` store. The vendored
-wrappers resolve the scope from `culture.yaml`'s `suffix` and default to **this
-agent's personal, private scope** (`--scope innereye --visibility private`),
-which routes to `$HOME/.eidetic/memory` — outside the repo, never committed.
-Both the `claude` and `colleague` backends resolve the same suffix, so they share
-these records. `--visibility public` contributes to the shared pool instead
-(public records inside a git repo route to `<repo-root>/.eidetic/memory` and *are*
-committed, so choose deliberately). `/recall` reads both and merges.
+The `recall` / `remember` skills are backed by the `eidetic` store. Both vendored
+wrappers resolve `--scope` from `culture.yaml`'s `suffix` (→ `innereye`), so this
+agent's records stay out of the global `default` scope, and both the `claude` and
+`colleague` backends resolve the same suffix and therefore share them.
+
+**Read this before your first `/remember`: the default is PUBLIC, not private.**
+When the suffix resolves and you pass no `--visibility`, `remember.sh` injects
+`--visibility public` — an explicit policy override, flagged as such in the
+script — and a public record inside a git repo is written to
+`<repo-root>/.eidetic/memory`, **committed and pushed**. `.eidetic/memory/` is
+tracked here and is not in `.gitignore`. A plain `/remember` therefore publishes
+to GitHub; it does not go to `$HOME`.
+
+So:
+
+- **`/remember --visibility private`** for anything session-derived, speculative,
+  or about the operator's machine and setup. That is what routes to
+  `$HOME/.eidetic/memory` and stays uncommitted.
+- **Plain `/remember`** only for a durable fact you would be happy to commit and
+  have teammates and mesh peers read.
+- `recall.sh` defaults the same way, so a flagless `/recall` searches the public
+  pool and **will not surface** private records — pass `--visibility private` to
+  read those back.
+
+Note the vendored `SKILL.md` descriptions and both scripts' own header comments
+still claim a private default, contradicting the code directly below them. The
+scripts are cited verbatim from guildmaster and must not be edited here; the
+contradiction belongs upstream as an issue. Trust the code, not the comment.
 
 - **`/recall` before you start** a non-trivial task — prior decisions, gotchas,
   "have we done this before?" — so you build on what is known.

@@ -132,7 +132,9 @@ from guildmaster instead.
 - **Tests**: `uv run pytest -n auto`. **Lint**: black, isort, flake8 (line
   length 100), bandit, markdownlint.
 - **Deploy**: pushing to `main` publishes to PyPI via Trusted Publishing
-  (`.github/workflows/publish.yml`); PRs do a TestPyPI dry-run.
+  (`.github/workflows/publish.yml`). A same-repo PR is **not** a dry run — it
+  rewrites the version to `<version>.dev<run_number>` and really uploads that to
+  TestPyPI. Both indexes are live today (PyPI has `innereye 0.9.0`).
 
 ## Layout
 

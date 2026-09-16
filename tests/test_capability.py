@@ -58,16 +58,16 @@ def test_refusal_names_a_backend_that_could() -> None:
         "future-backend",
         Capability(tasks=frozenset({"text_to_video"}), modalities=frozenset({"text"})),
     )
+    recipe = Recipe(task="text_to_video", inputs={"prompt": "x"})
+    backend = _Fake("comfyui", IMAGE_ONLY)
     with pytest.raises(CliError) as exc:
-        negotiate(
-            Recipe(task="text_to_video", inputs={"prompt": "x"}), _Fake("comfyui", IMAGE_ONLY)
-        )
+        negotiate(recipe, backend)
     assert "future-backend" in exc.value.remediation
 
 
 def test_unsupported_task_reports_the_task_not_the_modality() -> None:
+    recipe = Recipe(task="text_to_video", inputs={"prompt": "x"})
+    backend = _Fake("comfyui", IMAGE_ONLY)
     with pytest.raises(CliError) as exc:
-        negotiate(
-            Recipe(task="text_to_video", inputs={"prompt": "x"}), _Fake("comfyui", IMAGE_ONLY)
-        )
+        negotiate(recipe, backend)
     assert "task: text_to_video" in exc.value.message

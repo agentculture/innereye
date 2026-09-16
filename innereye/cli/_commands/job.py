@@ -191,10 +191,7 @@ def cmd_overview(args: argparse.Namespace) -> int:
             {"id": r.id, "state": r.state, "task": r.task, "backend": r.backend} for r in records
         ],
     }
-    if json_mode:
-        emit_result(payload, json_mode=True)
-        return 0
-    emit_result(_overview_text(records), json_mode=False)
+    emit_result(payload if json_mode else _overview_text(records), json_mode=json_mode)
     return 0
 
 

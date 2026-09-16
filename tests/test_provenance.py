@@ -133,8 +133,9 @@ def test_a_failed_sidecar_write_leaves_no_orphan_artifact(tmp_path, monkeypatch)
 
     monkeypatch.setattr(_os, "replace", flaky)
     target = tmp_path / "out.png"
+    payload = _prov()
     with pytest.raises(CliError):
-        prov.write_artifact(target, b"bytes", _prov())
+        prov.write_artifact(target, b"bytes", payload)
     assert not target.exists()
     assert not prov.sidecar_path(target).exists()
 

@@ -17,13 +17,29 @@ The full build brief is [issue #1](https://github.com/agentculture/innereye/issu
 (`gh issue view 1`). It is a starting position, not a spec — the design notes
 below record where this repo currently stands on it.
 
-### Status: scaffold only
+### Status: render and job implemented
 
-**Nothing in the generation domain is implemented yet.** What is on disk today
-is the `culture-agent-template` scaffold: the six agent-first verbs (`whoami`,
-`learn`, `explain`, `overview`, `doctor`, `cli overview`), the four harness
-prompt files, the vendored skill kit, and CI. There is no `render` verb, no
-backend adapter, no job store, no recipe type.
+**Implemented.** `innereye render` compiles a portable recipe into an
+operator-supplied ComfyUI template graph, submits it as a job, and `innereye job
+fetch` writes the artifact plus a provenance sidecar; `--preview` shows it in
+the terminal. Verified end to end on a DGX Spark (GB10): FLUX.1-dev produced a
+1024x1024 PNG in ~47s, and the same seed reproduced a **byte-identical** file.
+
+Still `(planned)`: a second backend adapter, and **embedding inputs** — no
+shipped template graph exposes an embedding node, so `embedding_to_image` is
+declared *unsupported* and refused rather than approximated.
+
+On disk: `recipe.py` (portable recipe + graph mapping), `backends/` (capability
+declaration, negotiation, stdlib HTTP, the ComfyUI adapter), `jobs.py` (a
+versioned, process-independent job store), `provenance.py`, `preview.py`, and
+the `render` / `job` verbs.
+
+> **ComfyUI has no authentication.** It ships no authn/authz of any kind, and
+> NVIDIA's playbook `launch.sh` runs `--listen 0.0.0.0`, which binds every
+> interface — exposing the GPU, every prior prompt via `/history`, and every
+> output via `/view` to anyone on the network. innereye defaults to
+> `http://127.0.0.1:8188` and you should launch ComfyUI with
+> `--listen 127.0.0.1` unless you have deliberately decided otherwise.
 
 Keep this section honest as that changes. When you describe a domain feature in
 any prompt file or the README before it exists, mark it `(planned)` — the

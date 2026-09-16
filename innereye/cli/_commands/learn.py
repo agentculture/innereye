@@ -24,18 +24,26 @@ supports; an unsupported request fails honestly naming a backend that can,
 never silently downgrading. Generation is modelled as jobs, and provenance
 (backend, model, seed, params, recipe) travels with every artifact.
 
-STATUS: scaffold. No generation verb is implemented yet — the commands below
-are the agent-first baseline only. See:
-https://github.com/agentculture/innereye/issues/1
-
 Commands
 --------
+  innereye render             Render an image or video (dry-run by default).
+  innereye job overview       List submitted jobs and the job store.
+  innereye job status <id>    Report one job's state.
+  innereye job fetch <id>     Download a finished job's artifacts.
+  innereye job cancel <id>    Stop a queued or running job.
   innereye whoami             Identity from culture.yaml.
   innereye learn              This self-teaching prompt.
   innereye explain <path>...  Markdown docs for any noun/verb path.
   innereye overview           Descriptive snapshot of the agent.
   innereye doctor             Check the agent-identity invariants.
   innereye cli overview       Describe the CLI surface itself.
+
+Rendering
+---------
+Every write verb is dry-run by default; --apply commits. You supply the
+template graph and its field-to-node mapping -- innereye ships no default
+graph, because node ids differ per graph. Fetch a demo pair with
+'innereye render --demo flux-text-to-image'. Video artifacts land as .webp.
 
 Machine-readable output
 -----------------------
@@ -63,8 +71,13 @@ def _as_json_payload() -> dict[str, object]:
             "Render and preview images and videos from text, image, or embedding "
             "inputs, via pluggable generation backends (ComfyUI first)."
         ),
-        "status": "scaffold: no generation verb implemented yet",
+        "status": "render and job verbs implemented; ComfyUI is the only backend",
         "commands": [
+            {"path": ["render"], "summary": "Render an image or video (dry-run by default)."},
+            {"path": ["job", "overview"], "summary": "List submitted jobs."},
+            {"path": ["job", "status"], "summary": "Report one job's state."},
+            {"path": ["job", "fetch"], "summary": "Download a finished job's artifacts."},
+            {"path": ["job", "cancel"], "summary": "Stop a queued or running job."},
             {"path": ["whoami"], "summary": "Identity probe from culture.yaml."},
             {"path": ["learn"], "summary": "Self-teaching prompt."},
             {"path": ["explain"], "summary": "Markdown docs by path."},

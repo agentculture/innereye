@@ -1,0 +1,52 @@
+{
+  "plan_slug": "visualize-via-comfyui-on-dgx-spark",
+  "schema_version": 2,
+  "created": "2026-09-16T00:50:28Z",
+  "updated": "2026-09-16T00:53:45Z",
+  "deviations": [
+    {
+      "id": "d1",
+      "what": "t9's job noun group ships overview, status, fetch and cancel -- but NOT a 'submit' sub-verb, which the task summary named. Submission lives on 'innereye render --apply' instead.",
+      "task_ref": "t9",
+      "reason": "a 'job submit' verb would need the full render surface (--graph, --mapping, --prompt, every param) to construct a recipe, duplicating 'render' exactly. render --apply IS the submit step and already returns a job handle, which is what the spec's submit/status/fetch shape actually asks for. Two verbs doing one thing is a worse CLI than one, and the rubric penalises redundant surface.",
+      "affects": [
+        "t8",
+        "c12"
+      ],
+      "origin": "llm",
+      "status": "proposed",
+      "classification": "acceptable",
+      "seq": 1
+    },
+    {
+      "id": "d2",
+      "what": "t1's GraphMapping accepts a LIST of node paths per recipe field, not only a single path, which the task's acceptance criteria did not anticipate.",
+      "task_ref": "t1",
+      "reason": "flux-text-to-image reads the resolution in TWO nodes -- EmptySD3LatentImage (27) and ModelSamplingFlux (30). Mapping params.width to only one silently mis-shifts the sampler while appearing to work. One-field-to-many-paths is required for a correct flux mapping, so the demo pair innereye ships would otherwise be subtly wrong.",
+      "affects": [
+        "t8"
+      ],
+      "origin": "llm",
+      "status": "proposed",
+      "classification": "acceptable",
+      "seq": 2
+    },
+    {
+      "id": "d3",
+      "what": "t14 (live acceptance) runs BEFORE t12 (prose sweep) and t13 (version bump), inverting the plan's declared wave order.",
+      "task_ref": "t14",
+      "reason": "the user's stated goal for this session is to actually generate an image; t14's dependency on t12/t13 was about PR hygiene ordering, not a functional prerequisite -- nothing in the live acceptance run depends on prose edits or a version bump. Running it first surfaces any real-render failure while there is still time to fix it, rather than after the cosmetic work. t12 and t13 still run before the PR.",
+      "affects": [
+        "t12",
+        "t13"
+      ],
+      "origin": "llm",
+      "status": "proposed",
+      "classification": "acceptable",
+      "seq": 3
+    }
+  ],
+  "evidence": [],
+  "deltas": [],
+  "supersessions": []
+}

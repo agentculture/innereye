@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-09-16
+
+### Added
+
+- **`innereye render` — the first generation verb.** Compiles a portable
+  `(task, inputs, params)` recipe into an **operator-supplied** ComfyUI template
+  graph and submits it as a job. Dry-run by default; `--apply` commits. Verified
+  end to end on a DGX Spark (GB10): FLUX.1-dev produced a 1024x1024 PNG in ~47 s,
+  and Wan 2.1 T2V produced a 17-frame animated WebP.
+- **`innereye job` noun group** — `overview`, `status`, `fetch`, `cancel`. Job
+  state is persisted with a `schema_version` from this first release, one file
+  per job written atomically, so a job submitted in one process is collectable
+  from another and two concurrent submits cannot collide.
+- **Capability negotiation, built before it was strictly needed.** Adapters
+  declare their tasks and input modalities; an unsupported request fails with a
+  non-zero exit naming a backend that could serve it. `embedding_to_image` is
+  declared **unsupported** and refused rather than approximated — no shipped
+  template graph exposes an embedding node.
+- **Provenance as output.** Every artifact gets a sidecar recording backend,
+  seed, container, resolution, steps and the full recipe. The seed is chosen by
+  innereye *before* submission and asserted present in the submitted graph, so it
+  is never a backend default read back after the fact. A same-seed re-run was
+  verified **byte-identical** on GB10.
+- **Terminal preview** — kitty graphics protocol where the terminal supports it
+  (ghostty, kitty), with a stdlib PNG decoder driving an ASCII fallback where it
+  does not. Never prints only a path and calls it a preview.
+- **`render --demo <name>`** — a separately named mode that downloads one of
+  NVIDIA's dgx-spark-playbook graphs plus a matching field-to-node mapping. The
+  ordinary render path never touches the network.
+- A generic introspection test that walks the registered argparse tree and
+  asserts every command has an `explain` catalog entry and its own `--json`.
+  Nothing checked this before, so a half-registered verb failed no test.
+
+### Changed
+
+- The runtime package still has **no third-party dependencies**. The ComfyUI
+  adapter speaks HTTP + JSON over `urllib`, including a hand-rolled multipart
+  upload, behind an explicit scheme guard so bandit's B310 needs only a narrow,
+  justified suppression.
+- The adapter targets ComfyUI's first-class **`/api/jobs`** surface (states
+  `pending`, `in_progress`, `completed`, `failed`, `cancelled`) and falls back to
+  `/history` only when that endpoint is absent — `/history` alone cannot
+  distinguish queued from running from failed.
+- Missing weights are **not** pre-flighted client-side. ComfyUI already fails
+  closed at submit with a per-node `node_errors` payload naming the input, the
+  received value and the valid list; innereye surfaces that as the remediation.
+- The five root prompt surfaces (`README.md`, `CLAUDE.md`, `AGENTS.override.md`,
+  `AGENTS.colleague.md`, `QWEN.md`) no longer claim the domain is unimplemented,
+  and each now states that **ComfyUI ships no authentication** while the
+  playbook's own `launch.sh` binds `0.0.0.0`.
+
+### Fixed
+
+- **Artifact writes refuse to clobber.** "Predictable paths" plus a recorded seed
+  meant a re-run silently overwrote the earlier artifact *and its provenance* —
+  destroying the very evidence the reproducibility claim rests on. Both paths are
+  now checked before either is written; `--overwrite` is explicit.
+- **`SaveAnimatedWEBP` also emits `"animated": [true]`**, a boolean flag beside
+  the real media list. Treating it as downloadable media crashed the first real
+  video fetch with `AttributeError: 'bool' object has no attribute 'get'`. Found
+  by the live acceptance run, not by the mocked tests.
+- **Terminal previews now go to stderr in both output modes.** Writing kitty
+  escape codes to stdout broke the "exactly one payload on stdout" contract under
+  `--json`. Caught by a test asserting stdout stays parseable.
+
 ## [0.10.1] - 2026-09-16
 
 ### Fixed

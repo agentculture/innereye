@@ -27,14 +27,17 @@ locked to one — generation backends are pluggable behind a portable
 `(task, inputs, params)` "recipe" each adapter compiles into its native form.
 
 **Read this before answering a question about what innereye does:** the domain
-is *not implemented yet*. On disk today there is only the
-`culture-agent-template` scaffold — six agent-first verbs (`whoami`, `learn`,
-`explain`, `overview`, `doctor`, `cli overview`), four harness prompt files, the
-vendored skill kit, and CI. There is no `render` verb, no backend adapter, and
-no job store. The intended design lives in
+is **implemented** for images and video via ComfyUI. `innereye render`
+compiles a recipe into an operator-supplied template graph and submits it as a
+job; `innereye job fetch` writes the artifact and a provenance sidecar. Verified
+on a DGX Spark: FLUX.1-dev at 1024x1024 in ~47s, byte-identical on a seed
+repeat. Still `(planned)`: a second adapter and embedding inputs, which are
+declared unsupported and refused rather than approximated. Fuller design in
 [issue #1](https://github.com/agentculture/innereye/issues/1) and
-[`CLAUDE.md`](CLAUDE.md); when you summarize it, say plainly that it is design,
-not shipped behaviour.
+[`CLAUDE.md`](CLAUDE.md).
+
+Note ComfyUI ships no authentication; innereye defaults to loopback and you
+should launch the server with `--listen 127.0.0.1`.
 
 It is a sibling to [`guildmaster`](https://github.com/agentculture/guildmaster)
 (the skills supplier), [`steward`](https://github.com/agentculture/steward)

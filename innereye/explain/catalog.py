@@ -28,12 +28,16 @@ Design commitments:
   with every artifact.
 - Write verbs are dry-run by default; `--apply` commits.
 
-**Status: scaffold.** No generation verb is implemented yet; the verbs below are
-the agent-first baseline. The design brief is
+**Status:** `render` and the `job` noun group are implemented against a ComfyUI
+backend. Still `(planned)`: a second adapter, and embedding inputs — no shipped
+template graph exposes an embedding node, so `embedding_to_image` is declared
+*unsupported* and refused rather than approximated. The design brief is
 <https://github.com/agentculture/innereye/issues/1>.
 
 ## Verbs
 
+- `innereye render` — render an image or video (dry-run by default).
+- `innereye job overview|status|fetch|cancel` — follow up submitted jobs.
 - `innereye whoami` — identity probe from `culture.yaml`.
 - `innereye learn` — structured self-teaching prompt.
 - `innereye explain <path>` — markdown docs for any noun/verb.
@@ -123,6 +127,74 @@ reported by the informational harness-prompts check and never substituted.
     innereye doctor --json
 """
 
+_RENDER = """\
+# innereye render
+
+Compile a portable recipe into an operator-supplied ComfyUI template graph and
+submit it as a job. **Dry-run by default** — a bare `render` prints the compiled
+recipe and the resolved backend and submits nothing; `--apply` commits.
+
+## The graph is a pair
+
+innereye ships no default template graph. Node ids are not stable across graphs
+(flux saves at node `9`, hidream at `12`), so a graph is only usable together
+with a mapping from recipe fields to node input paths:
+
+    {"output_node": "9", "fields": {"inputs.prompt": "6.inputs.text"}}
+
+By default the mapping is read from `<graph>.mapping.json`; `--mapping`
+overrides. Export a graph from ComfyUI with **Save (API Format)**.
+
+## Usage
+
+    innereye render --prompt "a snow leopard" --graph flux.api.json
+    innereye render --prompt "a snow leopard" --graph flux.api.json --apply --wait --preview
+    innereye render --demo flux-text-to-image --into graphs/
+    innereye render --prompt "..." --graph wan.api.json --task text_to_video --apply
+
+`--demo` is a separately named mode that downloads one of NVIDIA's playbook
+graphs plus a matching mapping. It is the only path here that touches the
+network, and it downloads the **graph**, not the model weights.
+
+## Notes
+
+- Video artifacts land as `.webp` (the playbook graphs end in `SaveAnimatedWEBP`);
+  the container is recorded in the provenance sidecar.
+- A capability mismatch is a user error naming an alternative, never a
+  best-effort render.
+- ComfyUI keeps its own copy of every artifact under its output directory,
+  named by an auto-incrementing counter. innereye does not clean that up.
+"""
+
+_JOB = """\
+# innereye job
+
+Follow up work that outlives the process that started it. `render --apply`
+returns a job handle; these verbs collect it — from any later invocation, since
+job state is persisted.
+
+## Verbs
+
+    innereye job overview           # the store, the states, and known jobs
+    innereye job status <id>        # one job's state
+    innereye job fetch <id>         # download artifacts + write provenance
+    innereye job cancel <id>        # stop a queued or running job
+
+## States
+
+`pending`, `in_progress`, `completed`, `failed`, `cancelled` come from the
+backend. `unknown` is innereye's own: a job this store remembers that the
+backend no longer recognises — restarting ComfyUI invalidates its queue ids.
+
+## Notes
+
+- `--wait` is the convenience blocking mode; progress goes to stderr so stdout
+  carries exactly one payload.
+- Artifacts refuse to overwrite an existing file unless `--overwrite` is passed,
+  because overwriting would destroy the earlier result's provenance.
+- The store lives at `$INNEREYE_JOB_STORE`, else `$XDG_STATE_HOME/innereye/jobs`.
+"""
+
 _CLI = """\
 # innereye cli
 
@@ -146,4 +218,10 @@ ENTRIES: dict[tuple[str, ...], str] = {
     ("doctor",): _DOCTOR,
     ("cli",): _CLI,
     ("cli", "overview"): _CLI,
+    ("render",): _RENDER,
+    ("job",): _JOB,
+    ("job", "overview"): _JOB,
+    ("job", "status"): _JOB,
+    ("job", "fetch"): _JOB,
+    ("job", "cancel"): _JOB,
 }

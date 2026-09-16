@@ -90,6 +90,14 @@ class JobRecord:
     schema_version: int = SCHEMA_VERSION
     recipe: dict[str, Any] = field(default_factory=dict)
     graph_path: str = ""
+    # The endpoint this job was submitted to. Without it, a follow-up
+    # `job fetch` falls back to the loopback default and either fails to find
+    # the job or -- worse -- finds a same-id job on a different server.
+    endpoint: str = ""
+    # Effective settings + digest captured at submit, so provenance survives
+    # even if the graph file later moves or changes.
+    resolved: dict[str, Any] = field(default_factory=dict)
+    input_digests: dict[str, str] = field(default_factory=dict)
     artifacts: list[str] = field(default_factory=list)
     error: str = ""
 
@@ -189,6 +197,9 @@ def record_for(
     output_node: str,
     recipe: dict[str, Any] | None = None,
     graph_path: str = "",
+    endpoint: str = "",
+    resolved: dict[str, Any] | None = None,
+    input_digests: dict[str, str] | None = None,
 ) -> JobRecord:
     """Build a fresh, pending record for a just-submitted job."""
     return JobRecord(
@@ -201,6 +212,9 @@ def record_for(
         created_at=time.time(),
         recipe=recipe or {},
         graph_path=graph_path,
+        endpoint=endpoint,
+        resolved=resolved or {},
+        input_digests=input_digests or {},
     )
 
 

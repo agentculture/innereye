@@ -28,8 +28,12 @@ readable copy; it is not the only one.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import ntpath
+import os
 import secrets
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -64,13 +68,19 @@ class Provenance:
     container: str
     recipe: dict[str, Any] = field(default_factory=dict)
     graph_path: str = ""
-    model: str = ""
-    sampler: str = ""
-    steps: int | None = None
-    width: int | None = None
-    height: int | None = None
-    fps: int | None = None
-    length: int | None = None
+    # A graph *path* is mutable and machine-local; the digest identifies the
+    # exact graph that ran even after the file moves or changes.
+    graph_digest: str = ""
+    # Effective settings read back out of the compiled graph, so a render that
+    # relied on graph defaults still records what it actually used rather than
+    # leaving nulls beside a 1024x1024 image.
+    models: list[str] = field(default_factory=list)
+    sampling: dict[str, Any] = field(default_factory=dict)
+    size: dict[str, Any] = field(default_factory=dict)
+    # sha256 of every binary input, so an image-conditioned render can be
+    # verified even though the bytes are not copied into the sidecar.
+    input_digests: dict[str, str] = field(default_factory=dict)
+    endpoint: str = ""
     backend_job_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -112,6 +122,55 @@ def assert_seed_submitted(payload: Any, seed: int) -> None:
         )
 
 
+def safe_artifact_name(filename: str) -> str:
+    """Reduce a backend-supplied filename to a safe, simple basename.
+
+    The backend is not trusted with a path. A remote or compromised ComfyUI can
+    return ``../../outside.png`` or an absolute path, and the caller asked for
+    the artifact to land under ``--out`` -- so anything with a separator, a
+    traversal component, or a drive/UNC prefix is refused rather than
+    normalised into something that looks fine.
+    """
+    raw = (filename or "").strip()
+    if not raw:
+        raise CliError(
+            code=EXIT_ENV_ERROR,
+            message="backend returned an artifact with no filename",
+            remediation="the backend response is malformed; nothing was written",
+        )
+    if "/" in raw or "\\" in raw or "\x00" in raw or ntpath.splitdrive(raw)[0]:
+        raise CliError(
+            code=EXIT_ENV_ERROR,
+            message=f"refusing backend filename containing a path: {raw!r}",
+            remediation="innereye writes artifacts only directly under --out",
+        )
+    if raw in {".", ".."} or raw.startswith(".."):
+        raise CliError(
+            code=EXIT_ENV_ERROR,
+            message=f"refusing traversal-shaped backend filename: {raw!r}",
+            remediation="innereye writes artifacts only directly under --out",
+        )
+    return raw
+
+
+def resolve_within(out_dir: Path, name: str) -> Path:
+    """Join ``name`` under ``out_dir`` and prove the result stays inside it."""
+    root = out_dir.resolve()
+    target = (root / safe_artifact_name(name)).resolve()
+    if target.parent != root:
+        raise CliError(
+            code=EXIT_ENV_ERROR,
+            message=f"artifact path {target} escapes the output directory {root}",
+            remediation="nothing was written",
+        )
+    return target
+
+
+def digest_bytes(data: bytes) -> str:
+    """sha256 of a binary input, recorded so the input can be verified later."""
+    return hashlib.sha256(data).hexdigest()
+
+
 def container_for(filename: str) -> str:
     """The recorded container for an artifact filename."""
     return _CONTAINERS.get(Path(filename).suffix.lower(), "unknown")
@@ -148,18 +207,40 @@ def write_artifact(
                     ),
                 )
 
+    # Stage both, then move both into place. Writing the artifact first and the
+    # sidecar second leaves a window where a disk-full or I/O error yields an
+    # artifact with no provenance -- and under overwrite, replaces a good
+    # artifact while leaving its sidecar stale. An artifact whose provenance is
+    # missing is exactly the thing this module exists to prevent.
+    payload = json.dumps(provenance.to_dict(), indent=2, sort_keys=True) + "\n"
+    tmp_artifact = tmp_sidecar = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-        sidecar.write_text(
-            json.dumps(provenance.to_dict(), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        fd, tmp_artifact = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.")
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        fd, tmp_sidecar = tempfile.mkstemp(dir=str(path.parent), prefix=f".{sidecar.name}.")
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(tmp_sidecar, sidecar)
+        tmp_sidecar = None
+        os.replace(tmp_artifact, path)
+        tmp_artifact = None
     except OSError as exc:
+        for leftover in (tmp_artifact, tmp_sidecar):
+            if leftover:
+                try:
+                    os.unlink(leftover)
+                except OSError:
+                    pass
         raise CliError(
             code=EXIT_ENV_ERROR,
             message=f"cannot write artifact to {path}: {exc}",
-            remediation=f"check permissions on {path.parent}",
+            remediation=f"check permissions and free space on {path.parent}",
         ) from exc
 
     return path, sidecar

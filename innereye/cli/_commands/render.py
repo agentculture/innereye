@@ -27,14 +27,25 @@ from typing import Any
 from innereye import jobs
 from innereye import provenance as prov
 from innereye.backends import _http, negotiate
-from innereye.backends.comfyui import DEFAULT_ENDPOINT, SERVER_SIDE_COPY_NOTE, ComfyUIBackend
+from innereye.backends.comfyui import (
+    DEFAULT_ENDPOINT,
+    SERVER_SIDE_COPY_NOTE,
+    ComfyUIBackend,
+    describe_graph,
+    graph_digest,
+)
 from innereye.cli._errors import EXIT_ENV_ERROR, EXIT_USER_ERROR, CliError
 from innereye.cli._output import emit_diagnostic, emit_result
-from innereye.recipe import Recipe, load_pair
+from innereye.recipe import Recipe, compile_recipe, load_pair
 
+# Pinned to an immutable commit, not refs/heads/main. A demo graph is copied
+# largely unchanged and then submitted to the operator's server, so tracking a
+# moving branch means an upstream change -- or an upstream compromise -- silently
+# alters the workload that runs on their GPU.
+_PLAYBOOK_COMMIT = "3410c65fbf4bdae2a7c0d8261f83ab665e2e0aa6"
 _PLAYBOOK_BASE = (
     "https://raw.githubusercontent.com/NVIDIA/dgx-spark-playbooks/"
-    "refs/heads/main/nvidia/playbook-comfyui/assets/workflow_api"
+    f"{_PLAYBOOK_COMMIT}/nvidia/playbook-comfyui/assets/workflow_api"
 )
 
 # Graph name -> (task, mapping). Node ids below were read from the actual
@@ -108,12 +119,39 @@ def _build_recipe(args: argparse.Namespace) -> Recipe:
 
 
 def _recipe_summary(recipe: Recipe) -> dict[str, Any]:
-    """Recipe rendered for display — image bytes become a length, not a blob."""
+    """Recipe rendered for display — image bytes become a length, not a blob.
+
+    This is the *display* form. It is deliberately not what gets persisted:
+    a byte count cannot verify or reproduce an image-conditioned render, so
+    :func:`_input_digests` carries a sha256 per binary input into provenance.
+    """
     shown = {
         key: (f"<{len(value)} bytes>" if isinstance(value, (bytes, bytearray)) else value)
         for key, value in recipe.inputs.items()
     }
     return {"task": recipe.task, "inputs": shown, "params": dict(recipe.params)}
+
+
+def _input_digests(recipe: Recipe) -> dict[str, str]:
+    """sha256 of every binary input, so image-conditioned renders stay verifiable."""
+    return {
+        key: prov.digest_bytes(bytes(value))
+        for key, value in recipe.inputs.items()
+        if isinstance(value, (bytes, bytearray))
+    }
+
+
+def _compilable(recipe: Recipe) -> Recipe:
+    """A recipe whose binary inputs are stand-in names, for validation only.
+
+    Lets a dry run compile the graph — proving the mapping and output node are
+    real — without uploading anything to the server.
+    """
+    placeheld = {
+        key: (f"<{key}>" if isinstance(value, (bytes, bytearray)) else value)
+        for key, value in recipe.inputs.items()
+    }
+    return Recipe(task=recipe.task, inputs=placeheld, params=recipe.params)
 
 
 def cmd_render(args: argparse.Namespace) -> int:
@@ -129,7 +167,7 @@ def cmd_render(args: argparse.Namespace) -> int:
             remediation=(
                 "supply an API-format graph exported from ComfyUI with Save (API Format), "
                 "plus its mapping; or fetch a demo pair with "
-                f"'innereye render --demo {sorted(DEMO_GRAPHS)[0]}'"
+                f"'innereye render --demo {min(DEMO_GRAPHS)}'"
             ),
         )
 
@@ -142,8 +180,16 @@ def cmd_render(args: argparse.Namespace) -> int:
     negotiate(recipe, backend)
 
     if not args.apply:
+        # Compile for real, so a malformed mapping or a bad output node fails
+        # HERE rather than after --apply has already uploaded images and
+        # queued work. Uses placeholder names for binary inputs so nothing is
+        # sent to the server.
+        preview_graph = compile_recipe(_compilable(recipe), graph, mapping)
+        resolved = describe_graph(preview_graph)
         payload = {
             "dry_run": True,
+            "resolved": resolved,
+            "graph_digest": graph_digest(preview_graph),
             "backend": backend.name,
             "endpoint": backend.endpoint,
             "graph": str(graph_path),
@@ -158,14 +204,18 @@ def cmd_render(args: argparse.Namespace) -> int:
                 "dry run — nothing submitted\n"
                 f"  backend: {backend.name} at {backend.endpoint}\n"
                 f"  graph:   {graph_path} (output node {mapping.output_node})\n"
+                f"  resolved: {json.dumps(resolved)}\n"
                 f"  recipe:  {json.dumps(_recipe_summary(recipe), indent=2)}\n"
                 "  pass --apply to generate",
                 json_mode=False,
             )
         return 0
 
+    digests = _input_digests(recipe)
     compiled = backend.compile(recipe, graph, mapping)
     prov.assert_seed_submitted(compiled, recipe.params["seed"])
+    resolved = describe_graph(compiled)
+    resolved["graph_digest"] = graph_digest(compiled)
     backend_job_id = backend.submit(compiled)
 
     record = jobs.record_for(
@@ -175,6 +225,9 @@ def cmd_render(args: argparse.Namespace) -> int:
         output_node=mapping.output_node,
         recipe=_recipe_summary(recipe),
         graph_path=str(graph_path),
+        endpoint=backend.endpoint,
+        resolved=resolved,
+        input_digests=digests,
     )
     jobs.save(record)
 

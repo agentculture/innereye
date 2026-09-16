@@ -26,11 +26,10 @@ def test_explicit_seed_is_honoured() -> None:
     assert prov.choose_seed(1234) == 1234
 
 
-def test_negative_and_bool_seeds_are_refused() -> None:
+@pytest.mark.parametrize("bad", [-1, True])
+def test_negative_and_bool_seeds_are_refused(bad) -> None:
     with pytest.raises(CliError):
-        prov.choose_seed(-1)
-    with pytest.raises(CliError):
-        prov.choose_seed(True)
+        prov.choose_seed(bad)
 
 
 def test_seed_must_be_present_in_the_submitted_payload() -> None:
@@ -84,9 +83,61 @@ def test_an_orphaned_sidecar_also_blocks(tmp_path) -> None:
 
 def test_sidecar_round_trips(tmp_path) -> None:
     target = tmp_path / "out.png"
-    prov.write_artifact(target, b"x", _prov(sampler="euler", steps=20, width=1024))
+    prov.write_artifact(
+        target,
+        b"x",
+        _prov(
+            sampling={"sampler_name": "euler", "steps": 20},
+            size={"width": 1024},
+            models=["flux1-dev.safetensors"],
+            graph_digest="abc123",
+        ),
+    )
     back = prov.read_sidecar(target)
-    assert back["sampler"] == "euler" and back["steps"] == 20 and back["width"] == 1024
+    assert back["sampling"]["sampler_name"] == "euler"
+    assert back["sampling"]["steps"] == 20
+    assert back["size"]["width"] == 1024
+    assert back["models"] == ["flux1-dev.safetensors"]
+    assert back["graph_digest"] == "abc123"
+
+
+@pytest.mark.parametrize("bad", ["../escape.png", "/etc/passwd", "a/b.png", "", "..", "."])
+def test_backend_filenames_cannot_escape_the_output_dir(bad) -> None:
+    """A remote or compromised backend must not choose where bytes land."""
+    with pytest.raises(CliError):
+        prov.safe_artifact_name(bad)
+
+
+def test_resolve_within_keeps_artifacts_under_out(tmp_path) -> None:
+    assert prov.resolve_within(tmp_path, "ok.png").parent == tmp_path.resolve()
+    with pytest.raises(CliError):
+        prov.resolve_within(tmp_path, "../ok.png")
+
+
+def test_a_failed_sidecar_write_leaves_no_orphan_artifact(tmp_path, monkeypatch) -> None:
+    """An artifact without provenance is the one thing this module must never leave."""
+    import os as _os
+
+    real = _os.replace
+    calls = {"n": 0}
+
+    def flaky(src, dst):
+        calls["n"] += 1
+        if calls["n"] == 1:  # the sidecar move
+            raise OSError("no space left on device")
+        return real(src, dst)
+
+    monkeypatch.setattr(_os, "replace", flaky)
+    target = tmp_path / "out.png"
+    with pytest.raises(CliError):
+        prov.write_artifact(target, b"bytes", _prov())
+    assert not target.exists()
+    assert not prov.sidecar_path(target).exists()
+
+
+def test_digest_bytes_is_stable() -> None:
+    assert prov.digest_bytes(b"abc") == prov.digest_bytes(b"abc")
+    assert prov.digest_bytes(b"abc") != prov.digest_bytes(b"abd")
 
 
 def test_missing_sidecar_is_a_user_error(tmp_path) -> None:

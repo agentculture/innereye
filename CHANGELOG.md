@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/). This project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2026-09-16
+
+### Fixed
+
+Addresses the Qodo review and the SonarCloud findings on PR #3. All twelve Qodo
+findings were valid; none needed pushback.
+
+- **Backend filenames could escape `--out`.** `collect()` used the
+  backend-supplied filename directly, so a remote or compromised ComfyUI could
+  return `../../outside.png` and have innereye write there. Filenames are now
+  reduced to a verified simple basename, and every destination is proven to sit
+  directly under the resolved output root before anything is written.
+- **`cancel` could stop an unrelated render.** A failed targeted cancel fell back
+  to ComfyUI's **global** `/interrupt`, which stops whatever is running, and then
+  marked the requested job cancelled regardless. There is no global fallback any
+  more: a server without `/api/jobs` gets an honest refusal, and `cancelled` is
+  recorded only after a targeted cancel succeeded.
+- **`video_to_video` was declared but could not be expressed.** `Recipe` has no
+  video input modality and the CLI has no way to supply a source clip, so the
+  task passed capability negotiation and then failed late -- exactly the lie the
+  negotiation layer exists to prevent. It is no longer declared.
+- **Provenance recorded the command line, not the render.** A render relying on
+  graph defaults produced a sidecar saying `width: null` beside a 1024x1024
+  image. `describe_graph()` now reads the effective models, sampler, scheduler,
+  steps and dimensions back out of the compiled graph, and a `graph_digest`
+  identifies the exact graph even after the file moves.
+- **Image inputs vanished from provenance.** The display summary, which replaces
+  bytes with a count, was being persisted as the recipe. Binary inputs now carry
+  a sha256 in `input_digests`.
+- **Follow-up commands targeted the wrong server.** The endpoint is persisted on
+  the job record and used by `job status/fetch/cancel`, so a render submitted to
+  a remote ComfyUI is no longer followed up against loopback.
+- **Concurrent image renders could consume each other's inputs.** Uploads used a
+  fixed `innereye_<field>.png` with overwrite enabled, so a later render could
+  replace bytes a queued job still referenced. Every upload now gets a unique
+  name.
+- **A lost job burned the full timeout.** `wait_for()` kept polling
+  `STATE_UNKNOWN`; it now fails immediately, since a backend that has forgotten
+  a job will not remember it in 900 seconds.
+- **Dry runs did not compile.** The advertised pre-spend check never validated
+  the mapping or the output node, so a malformed pair passed the dry run and
+  failed only under `--apply`. Dry runs now compile for real, using placeholder
+  names for binary inputs so nothing reaches the server.
+- **Artifact and sidecar could separate.** Both are staged to temp files and
+  moved into place, so an I/O failure cannot leave an artifact without its
+  provenance.
+- **The demo download tracked a moving branch.** `--demo` is pinned to an
+  immutable commit; upstream can no longer change what runs on the operator's
+  GPU.
+- **Preview could be memory-bombed.** `decode_png` caps both pixel count and
+  decompressed size, so a small malicious PNG falls back to a described preview
+  instead of exhausting the process.
+- SonarCloud: merged an implicitly concatenated string, reduced cognitive
+  complexity in `fetch()` and `decode_png()`, replaced duplicated argparse help
+  literals with constants, used `min()` instead of sorting, and split composite
+  assertions and multi-call `pytest.raises` blocks in the test suite.
+
 ## [0.11.0] - 2026-09-16
 
 ### Added

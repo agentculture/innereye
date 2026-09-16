@@ -4,7 +4,7 @@
   "schema_version": 6,
   "status": "exported",
   "created": "2026-09-15T23:57:24Z",
-  "updated": "2026-09-16T02:06:38Z",
+  "updated": "2026-09-16T02:23:33Z",
   "claims": [
     {
       "id": "c1",
@@ -822,6 +822,15 @@
       "claim_id": null,
       "resolved": true,
       "resolution": "resolved by live exercise: ComfyUI 0.33.2 was started on 127.0.0.1:8188 (loopback, per c36) without weights, and every endpoint the spec names was called for real \u2014 /system_stats, /api/jobs, /api/jobs status validation, /history, /queue, /object_info, /upload/image, /view, and /prompt on both an outputless and a missing-weights graph. Two confirmed claims were corrected by the results (c31, c34). Rendering itself remains unexercised pending the weights, which c33 already gates.",
+      "resolution_claim_id": null
+    },
+    {
+      "id": "v8",
+      "text": "provenance is incomplete when the operator relies on graph defaults: pi's render produced a 1024x1024 PNG, but the sidecar records width/height/steps as null because pi set no --width/--height/--steps flags and the values came from the template graph. The sidecar records what the RECIPE set, not the EFFECTIVE values actually used, so a reader cannot tell the resolution from the provenance even though the artifact has one. Found by having the pi harness drive the skill.",
+      "kind": "follow_up",
+      "claim_id": null,
+      "resolved": true,
+      "resolution": "fixed: describe_graph() reads the effective settings back out of the compiled graph and they are captured at submit into the job record, so the sidecar now records models, sampling, size, graph_digest and endpoint even when the caller passed no flags. Verified live -- a 768x768 render with only --width/--height/--steps set now records all four model files, sampler, scheduler, denoise and the graph digest.",
       "resolution_claim_id": null
     }
   ],

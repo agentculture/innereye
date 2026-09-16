@@ -21,7 +21,7 @@ MAPPING = {
 }
 
 
-@pytest.fixture()
+@pytest.fixture
 def pair(tmp_path):
     g = tmp_path / "flux.api.json"
     g.write_text(json.dumps(GRAPH))
@@ -124,3 +124,37 @@ def test_demo_catalog_node_ids_differ_between_graphs() -> None:
     wan = render_cmd.DEMO_GRAPHS["wan-text-to-video"]["mapping"]
     assert flux["output_node"] != wan["output_node"]
     assert flux["fields"]["params.seed"] != wan["fields"]["params.seed"]
+
+
+def test_dry_run_compiles_so_a_bad_mapping_fails_before_spending(tmp_path, capsys) -> None:
+    """A pre-spend check that does not compile is not a check."""
+    g = tmp_path / "g.api.json"
+    g.write_text(json.dumps(GRAPH))
+    (tmp_path / "g.api.json.mapping.json").write_text(
+        json.dumps(
+            {
+                "output_node": "404",  # names a node the graph does not have
+                "fields": {
+                    "inputs.prompt": "6.inputs.text",
+                    "params.seed": "25.inputs.noise_seed",
+                },
+            }
+        )
+    )
+    rc = main(["render", "--prompt", "x", "--graph", str(g)])
+    assert rc == 1
+    assert "404" in capsys.readouterr().err
+
+
+def test_dry_run_reports_the_effective_settings(pair, capsys) -> None:
+    rc = main(["render", "--prompt", "a", "--graph", str(pair), "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["graph_digest"]
+    assert "sampling" in payload["resolved"]
+
+
+def test_demo_download_is_pinned_to_an_immutable_commit() -> None:
+    """A moving branch means upstream can change what runs on the operator's GPU."""
+    assert "refs/heads/main" not in render_cmd._PLAYBOOK_BASE
+    assert len(render_cmd._PLAYBOOK_COMMIT) == 40

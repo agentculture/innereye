@@ -70,9 +70,7 @@ def _dispatch(
         raise CliError(
             code=EXIT_ENV_ERROR,
             message=f"cannot reach backend at {endpoint}: {exc.reason}",
-            remediation=(
-                "start the backend and confirm the endpoint, e.g. " "curl -I http://127.0.0.1:8188"
-            ),
+            remediation="start the backend and confirm the endpoint, e.g. curl -I 127.0.0.1:8188",
         ) from exc
     except TimeoutError as exc:
         raise CliError(

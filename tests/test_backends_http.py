@@ -46,7 +46,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
 
-@pytest.fixture()
+@pytest.fixture
 def server():
     """Port 0 lets the OS choose -- safe under pytest -n auto."""
     httpd = HTTPServer(("127.0.0.1", 0), _Handler)
@@ -97,8 +97,9 @@ def test_non_http_scheme_is_refused(tmp_path) -> None:
     """The narrow, justified alternative to a blanket bandit B310 suppression."""
     target = tmp_path / "secret.txt"
     target.write_text("do not read me")
+    uri = target.as_uri()
     with pytest.raises(CliError) as exc:
-        _http.get_json(target.as_uri())
+        _http.get_json(uri)
     assert "non-HTTP scheme" in exc.value.message
 
 

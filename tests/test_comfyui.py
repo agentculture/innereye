@@ -79,7 +79,7 @@ class _Transport:
         return self._match(url)
 
 
-@pytest.fixture()
+@pytest.fixture
 def transport(monkeypatch):
     def install(routes):
         t = _Transport(routes)
@@ -109,8 +109,9 @@ def test_submit_returns_prompt_id(transport) -> None:
 def test_missing_weights_surfaces_the_servers_own_node_errors(transport) -> None:
     """No client-side /object_info pre-flight -- the server's error is better."""
     transport({"/prompt": (400, MISSING_WEIGHTS)})
+    backend = ComfyUIBackend()
     with pytest.raises(CliError) as exc:
-        ComfyUIBackend().submit({"10": {}})
+        backend.submit({"10": {}})
     assert exc.value.code == 1
     assert "failed validation" in exc.value.message
     assert "vae_name" in exc.value.remediation
@@ -189,8 +190,9 @@ def test_failed_job_carries_the_server_error_out(transport) -> None:
             ),
         }
     )
+    backend = ComfyUIBackend()
     with pytest.raises(CliError) as exc:
-        ComfyUIBackend().fetch("bad", "2")
+        backend.fetch("bad", "2")
     assert exc.value.code == 2
     assert "OOM" in exc.value.remediation
 
@@ -199,8 +201,9 @@ def test_fetch_on_an_incomplete_job_is_a_user_error(transport) -> None:
     transport(
         {"/api/jobs": (200, {}), "/api/jobs/abc": (200, {"id": "abc", "status": "in_progress"})}
     )
+    backend = ComfyUIBackend()
     with pytest.raises(CliError) as exc:
-        ComfyUIBackend().fetch("abc", "2")
+        backend.fetch("abc", "2")
     assert exc.value.code == 1
     assert "in_progress" in exc.value.message
 
@@ -211,10 +214,45 @@ def test_cancel_uses_the_jobs_api(transport) -> None:
     assert any(call.endswith("/api/jobs/abc/cancel") for call in t.calls)
 
 
-def test_cancel_falls_back_to_interrupt(transport) -> None:
-    t = transport({"/api/jobs": (404, {}), "/interrupt": (200, {})})
-    ComfyUIBackend().cancel("abc")
-    assert any("/interrupt" in call for call in t.calls)
+def test_cancel_never_falls_back_to_global_interrupt(transport) -> None:
+    """/interrupt stops whatever is running -- not necessarily the job asked about."""
+    t = transport({"/api/jobs": (404, {})})
+    backend = ComfyUIBackend()
+    with pytest.raises(CliError) as exc:
+        backend.cancel("abc")
+    assert exc.value.code == 2
+    assert "cannot be cancelled by id" in exc.value.message
+    assert not any("/interrupt" in call for call in t.calls)
+
+
+def test_video_to_video_is_not_declared() -> None:
+    """Recipe has no video input modality, so advertising the task would fail late."""
+    assert "video_to_video" not in comfyui.CAPABILITY.tasks
+
+
+def test_image_uploads_get_unique_names(transport) -> None:
+    """A fixed name + overwrite lets a later render replace a queued job's image."""
+    t = transport({"/upload/image": (200, {"name": "server.png"})})
+    graph = {"52": {"class_type": "LoadImage", "inputs": {"image": "x"}}}
+    mapping = GraphMapping(fields={"inputs.image": "52.inputs.image"}, output_node="52")
+    be = ComfyUIBackend()
+    be.compile(Recipe(task="image_to_video", inputs={"image": b"a"}), graph, mapping)
+    be.compile(Recipe(task="image_to_video", inputs={"image": b"b"}), graph, mapping)
+    assert len(t.calls) == 2
+
+
+def test_describe_graph_reads_effective_settings() -> None:
+    """Provenance must describe the artifact, not just the command line."""
+    g = {
+        "12": {"class_type": "UNETLoader", "inputs": {"unet_name": "flux1-dev.safetensors"}},
+        "17": {"class_type": "BasicScheduler", "inputs": {"steps": 20, "model": ["30", 0]}},
+        "27": {"class_type": "EmptySD3LatentImage", "inputs": {"width": 1024, "height": 1024}},
+    }
+    d = comfyui.describe_graph(g)
+    assert d["models"] == ["flux1-dev.safetensors"]
+    assert d["sampling"]["steps"] == 20
+    assert d["size"]["width"] == 1024
+    assert comfyui.graph_digest(g) == comfyui.graph_digest(dict(g))
 
 
 def test_image_input_is_uploaded_and_replaced_by_its_server_name(transport) -> None:

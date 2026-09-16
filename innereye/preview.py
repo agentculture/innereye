@@ -29,6 +29,12 @@ from pathlib import Path
 _KITTY_CHUNK = 4096
 _ASCII_RAMP = " .:-=+*#%@"
 
+# A preview decodes bytes from a backend we do not control. Cap both the pixel
+# count and the decompressed size so a small "decompression bomb" PNG cannot
+# exhaust this process's memory -- the backend may be remote or compromised.
+MAX_PIXELS = 64_000_000  # ~8000x8000, far beyond any sane render
+MAX_DECOMPRESSED = 512 * 1024 * 1024
+
 _KITTY_TERMS = ("xterm-kitty", "xterm-ghostty")
 _KITTY_PROGRAMS = ("ghostty", "kitty", "wezterm")
 
@@ -102,16 +108,24 @@ def decode_png(data: bytes) -> tuple[int, int, list[tuple[int, int, int]]] | Non
     channels = {0: 1, 2: 3, 6: 4}.get(color_type)
     if channels is None:
         return None
+    if width * height > MAX_PIXELS:
+        return None  # refuse to allocate; the caller falls back to a description
 
-    try:
-        raw = zlib.decompress(bytes(idat))
-    except zlib.error:
+    raw = _inflate_bounded(bytes(idat))
+    if raw is None:
         return None
 
     stride = width * channels
     if len(raw) < (stride + 1) * height:
         return None
 
+    return width, height, _scanlines_to_rgb(raw, width, height, stride, channels)
+
+
+def _scanlines_to_rgb(
+    raw: bytes, width: int, height: int, stride: int, channels: int
+) -> list[tuple[int, int, int]]:
+    """Unfilter each scanline and flatten it to RGB triples."""
     pixels: list[tuple[int, int, int]] = []
     previous = bytearray(stride)
     offset = 0
@@ -127,8 +141,19 @@ def decode_png(data: bytes) -> tuple[int, int, list[tuple[int, int, int]]] | Non
             else:
                 pixels.append((line[x], line[x + 1], line[x + 2]))
         previous = line
+    return pixels
 
-    return width, height, pixels
+
+def _inflate_bounded(data: bytes) -> bytes | None:
+    """Inflate with a hard output cap, so a bomb fails instead of allocating."""
+    engine = zlib.decompressobj()
+    try:
+        out = engine.decompress(data, MAX_DECOMPRESSED)
+    except zlib.error:
+        return None
+    if engine.unconsumed_tail:
+        return None  # more output than the cap allows
+    return out
 
 
 def _unfilter(filter_type: int, line: bytearray, previous: bytearray, channels: int) -> None:

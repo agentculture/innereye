@@ -33,6 +33,9 @@ never cleans it. See :data:`SERVER_SIDE_COPY_NOTE`.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import uuid
 from typing import Any, Mapping, Sequence
 
 from innereye.backends import Capability, _http, register_capability
@@ -52,7 +55,6 @@ from innereye.recipe import (
     TASK_IMAGE_TO_VIDEO,
     TASK_TEXT_TO_IMAGE,
     TASK_TEXT_TO_VIDEO,
-    TASK_VIDEO_TO_VIDEO,
     GraphMapping,
     Recipe,
     compile_recipe,
@@ -95,16 +97,76 @@ CAPABILITY = Capability(
             TASK_IMAGE_TO_IMAGE,
             TASK_TEXT_TO_VIDEO,
             TASK_IMAGE_TO_VIDEO,
-            TASK_VIDEO_TO_VIDEO,
         }
     ),
-    # No embedding. ComfyUI can be driven with raw CONDITIONING, but no graph
-    # innereye ships exposes it, so declaring it would be a lie the negotiation
-    # layer could not catch.
+    # No embedding: ComfyUI can be driven with raw CONDITIONING, but no graph
+    # innereye ships exposes it. And no video_to_video -- Recipe has no video
+    # input modality and the CLI has no way to supply a source clip, so a
+    # caller could pass negotiation and still be unable to express the request.
+    # Declaring either would be exactly the lie the negotiation layer exists to
+    # catch, and a capability that cannot be exercised is worse than an absent
+    # one because it fails late instead of at the boundary.
     modalities=frozenset({MODALITY_TEXT, MODALITY_IMAGE}),
 )
 
 register_capability(BACKEND_NAME, CAPABILITY)
+
+
+# Node inputs that name a model file, by convention across ComfyUI loaders.
+_MODEL_INPUTS = (
+    "unet_name",
+    "ckpt_name",
+    "model_name",
+    "vae_name",
+    "clip_name",
+    "clip_name1",
+    "clip_name2",
+)
+# Node inputs that describe how sampling actually ran.
+_SAMPLER_INPUTS = ("sampler_name", "scheduler", "steps", "cfg", "denoise")
+_SIZE_INPUTS = ("width", "height", "length", "fps")
+
+
+def describe_graph(compiled: Mapping[str, Any]) -> dict[str, Any]:
+    """Read the settings a compiled graph will actually run with.
+
+    Provenance that only records what the *caller* passed is incomplete: a
+    render that relies on the template graph's defaults ends up with a sidecar
+    saying ``width: null`` beside a 1024x1024 image. This reads the effective
+    values back out of the graph after compilation, so the sidecar describes
+    the artifact rather than the command line.
+    """
+    models: list[str] = []
+    sampling: dict[str, Any] = {}
+    size: dict[str, Any] = {}
+
+    for node in compiled.values():
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs") or {}
+        if not isinstance(inputs, dict):
+            continue
+        for key, value in inputs.items():
+            if isinstance(value, list):
+                continue  # a wire to another node, not a literal
+            if key in _MODEL_INPUTS and isinstance(value, str) and value not in models:
+                models.append(value)
+            elif key in _SAMPLER_INPUTS and key not in sampling:
+                sampling[key] = value
+            elif key in _SIZE_INPUTS and key not in size:
+                size[key] = value
+
+    return {"models": models, "sampling": sampling, "size": size}
+
+
+def graph_digest(compiled: Mapping[str, Any]) -> str:
+    """A stable sha256 over the exact graph submitted.
+
+    A graph *path* is mutable and machine-local; a digest identifies the graph
+    that actually ran even after the file moves or changes.
+    """
+    canonical = json.dumps(compiled, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 class ComfyUIBackend:
@@ -145,7 +207,13 @@ class ComfyUIBackend:
         for field in ("image", "mask", "control_image"):
             value = resolved.get(field)
             if isinstance(value, (bytes, bytearray)):
-                resolved[field] = self.upload_image(f"innereye_{field}.png", bytes(value))
+                # A per-upload unique name. A fixed "innereye_<field>.png" plus
+                # overwrite=true means a later render replaces the bytes an
+                # earlier queued job still refers to, and that job then renders
+                # someone else's image -- silently, since LoadImage resolves the
+                # name at execution time, not at submit time.
+                unique = f"innereye_{field}_{uuid.uuid4().hex[:12]}.png"
+                resolved[field] = self.upload_image(unique, bytes(value))
         prepared = Recipe(task=recipe.task, inputs=resolved, params=recipe.params)
         return compile_recipe(prepared, graph, mapping)
 
@@ -263,12 +331,7 @@ class ComfyUIBackend:
                 remediation="check the mapping's output_node matches the graph's save node",
             )
 
-        artifacts: list[tuple[str, bytes]] = []
-        for key in _MEDIA_KEYS:
-            for item in node_outputs.get(key) or []:
-                if not isinstance(item, dict) or "filename" not in item:
-                    continue  # e.g. SaveAnimatedWEBP's "animated": [true] flag
-                artifacts.append(self._download(item))
+        artifacts = [self._download(item) for item in _media_items(node_outputs)]
         if not artifacts:
             raise CliError(
                 code=EXIT_USER_ERROR,
@@ -296,20 +359,47 @@ class ComfyUIBackend:
     # -- cancel ---------------------------------------------------------
 
     def cancel(self, job_id: str) -> None:
-        """Stop a queued or running job."""
-        if self.has_jobs_api():
-            code, _ = _http.post_json(
-                f"{self.endpoint}/api/jobs/{job_id}/cancel", {}, timeout=self.timeout
+        """Stop a queued or running job — targeted, or not at all.
+
+        ``/interrupt`` is **global**: it stops whatever is currently executing,
+        which is not necessarily the job asked about. Falling back to it when a
+        targeted cancel fails would stop an unrelated render while leaving the
+        requested job running, so it is not a fallback here. A server without
+        the jobs API gets an honest refusal instead.
+        """
+        if not self.has_jobs_api():
+            raise CliError(
+                code=EXIT_ENV_ERROR,
+                message=f"this ComfyUI has no /api/jobs, so job {job_id} cannot be cancelled by id",
+                remediation=(
+                    "upgrade ComfyUI, or stop the current job from its web UI -- "
+                    "innereye will not call the global /interrupt, which would stop "
+                    "whatever is running rather than this job"
+                ),
             )
-            if code < 400:
-                return
-        code, _ = _http.post_json(f"{self.endpoint}/interrupt", {}, timeout=self.timeout)
+        code, body = _http.post_json(
+            f"{self.endpoint}/api/jobs/{job_id}/cancel", {}, timeout=self.timeout
+        )
         if code >= 400:
             raise CliError(
                 code=EXIT_ENV_ERROR,
                 message=f"ComfyUI refused to cancel job {job_id} (HTTP {code})",
-                remediation="the job may already have finished",
+                remediation=f"it may already have finished; server said: {str(body)[:200]}",
             )
+
+
+def _media_items(node_outputs: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """The downloadable entries in one node's outputs.
+
+    Skips non-dict entries: SaveAnimatedWEBP reports its .webp under "images"
+    but also emits ``"animated": [true]``, a boolean flag that is not media.
+    """
+    items: list[Mapping[str, Any]] = []
+    for key in _MEDIA_KEYS:
+        for item in node_outputs.get(key) or []:
+            if isinstance(item, dict) and "filename" in item:
+                items.append(item)
+    return items
 
 
 def _from_jobs_api(payload: Mapping[str, Any]) -> dict[str, Any]:

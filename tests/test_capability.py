@@ -32,8 +32,10 @@ def _clean_registry():
 
 
 def test_capability_rejects_an_unknown_task_declaration() -> None:
+    tasks = frozenset({"text_to_smell"})
+    modalities = frozenset({"text"})
     with pytest.raises(CliError):
-        Capability(tasks=frozenset({"text_to_smell"}), modalities=frozenset({"text"}))
+        Capability(tasks=tasks, modalities=modalities)
 
 
 def test_supported_recipe_passes_negotiation() -> None:
@@ -43,8 +45,9 @@ def test_supported_recipe_passes_negotiation() -> None:
 def test_embedding_input_is_refused_never_downgraded() -> None:
     """The load-bearing refusal: no silent fallback to 'the closest text prompt'."""
     recipe = Recipe(task="embedding_to_image", inputs={"embedding": [0.1, 0.2]})
+    backend = _Fake("comfyui", IMAGE_ONLY)
     with pytest.raises(CliError) as exc:
-        negotiate(recipe, _Fake("comfyui", IMAGE_ONLY))
+        negotiate(recipe, backend)
     assert exc.value.code == 1
     assert "embedding" in exc.value.message
     assert "will not approximate" in exc.value.remediation

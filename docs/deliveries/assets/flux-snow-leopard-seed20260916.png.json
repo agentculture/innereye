@@ -1,0 +1,27 @@
+{
+  "backend": "comfyui",
+  "backend_job_id": "4b502aac-25ad-44c2-ad4c-ab4736caa77c",
+  "container": "png",
+  "fps": null,
+  "graph_path": "/home/spark/comfy/graphs/flux-text-to-image.api.json",
+  "height": 1024,
+  "length": null,
+  "model": "",
+  "recipe": {
+    "inputs": {
+      "prompt": "a majestic snow leopard resting on a cliff at golden hour, photorealistic, sharp detail"
+    },
+    "params": {
+      "height": 1024,
+      "seed": 20260916,
+      "steps": 20,
+      "width": 1024
+    },
+    "task": "text_to_image"
+  },
+  "sampler": "",
+  "seed": 20260916,
+  "steps": 20,
+  "task": "text_to_image",
+  "width": 1024
+}

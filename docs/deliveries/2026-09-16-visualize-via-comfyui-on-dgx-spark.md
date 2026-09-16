@@ -31,6 +31,35 @@ Quoted verbatim from the `devague summary` skeleton:
 - `t13` — version bump, changelog, and the deliberate index spend
 - `t14` — live acceptance: one image and one video against the running server
 
+## Prompt → Result
+
+The artifacts are committed beside this summary so the evidence is resolvable to
+a reader who was not present for the run.
+
+### Image — FLUX.1-dev
+
+> a majestic snow leopard resting on a cliff at golden hour, photorealistic,
+> sharp detail
+
+`--width 1024 --height 1024 --steps 20 --seed 20260916` · ~47 s
+
+![FLUX.1-dev, 1024x1024, seed 20260916](assets/flux-snow-leopard-seed20260916.png)
+
+- artifact: [`assets/flux-snow-leopard-seed20260916.png`](assets/flux-snow-leopard-seed20260916.png)
+- provenance: [`assets/flux-snow-leopard-seed20260916.png.json`](assets/flux-snow-leopard-seed20260916.png.json)
+- sha256 `ed356ab1c787a04fc47896d0445bb10352c79214e5789d209b309c7a23876f4d` —
+  identical across two independent runs of the same seed
+
+### Video — Wan 2.1 T2V 14B
+
+> a drone shot flying over a misty mountain forest at sunrise, cinematic
+
+`--task text_to_video --width 480 --height 320 --length 17 --fps 12 --steps 6 --seed 7`
+
+- artifact: [`assets/wan-misty-forest-seed7.webp`](assets/wan-misty-forest-seed7.webp)
+  — animated WebP, 17 ANMF frames, matching the requested `length` exactly
+- provenance: [`assets/wan-misty-forest-seed7.webp.json`](assets/wan-misty-forest-seed7.webp.json)
+
 ## Actual Delivery
 
 | Plan task | Status | What actually landed |
@@ -104,8 +133,9 @@ Decisions not covered by any deviation record:
 - lint: `markdownlint-cli2` (committed files) — 0 errors
 - rubric: `teken cli doctor . --strict` — **26 PASS, 0 FAIL**
 - harness: `scripts/harness-smoke.py --stage config --require config` — 6 passed, 0 failed
-- artifacts: `/home/spark/comfy/renders/159463c8737e_flux_output_00001_.png` (1 315 167 B, 1024×1024)
-  and `/home/spark/comfy/renders/864e333bea05_wan_t2v_output_00001_.webp` (137 488 B, 17 ANMF frames)
+- artifacts (committed, see Prompt → Result above):
+  `docs/deliveries/assets/flux-snow-leopard-seed20260916.png` (1 315 167 B, 1024×1024)
+  and `docs/deliveries/assets/wan-misty-forest-seed7.webp` (137 488 B, 17 ANMF frames)
 - reproduction: both runs of seed `20260916` hashed `ed356ab1c787a04fc47896d0445bb10352c79214e5789d209b309c7a23876f4d`
 - commits: `a909f9e..5356904`
 - devague: obligations `o1`–`o13`, evidence `e1`–`e10` (all `proposed`), deltas `b1`–`b6` (all `proposed`)
@@ -127,8 +157,8 @@ live run then found.
 
 | Claim | Confidence | Evidence |
 |-------|------------|----------|
-| `innereye render` produces a real image on a DGX Spark | high | artifact `159463c8737e_flux_output_00001_.png` · commit `5356904` |
-| `innereye render` produces a real video (animated WebP) | high | artifact `864e333bea05_wan_t2v_output_00001_.webp`, 17 ANMF frames |
+| `innereye render` produces a real image on a DGX Spark | high | artifact `docs/deliveries/assets/flux-snow-leopard-seed20260916.png` · commit `5356904` |
+| `innereye render` produces a real video (animated WebP) | high | artifact `docs/deliveries/assets/wan-misty-forest-seed7.webp`, 17 ANMF frames |
 | Same seed reproduces a byte-identical artifact on GB10 | high | two live runs, sha256 `ed356ab1…` identical |
 | Artifact writes refuse to clobber prior results and their provenance | high | test `tests/test_provenance.py::test_same_seed_twice_refuses_to_destroy_the_first_result` |
 | All five ComfyUI job states round-trip through the adapter | high | test `tests/test_comfyui.py::test_all_five_states_round_trip` · live `GET /api/jobs?status=bogus` |

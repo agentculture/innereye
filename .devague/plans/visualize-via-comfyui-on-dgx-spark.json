@@ -1,0 +1,811 @@
+{
+  "slug": "visualize-via-comfyui-on-dgx-spark",
+  "title": "visualize via ComfyUI on DGX Spark",
+  "frame_slug": "visualize-via-comfyui-on-dgx-spark",
+  "schema_version": 5,
+  "status": "exported",
+  "created": "2026-09-16T00:32:13Z",
+  "updated": "2026-09-16T00:37:09Z",
+  "targets": [
+    {
+      "id": "c1",
+      "kind": "announcement",
+      "text": "innereye render turns a prompt into an actual picture on a DGX Spark: submitted as a job to a local ComfyUI, artifact and provenance JSON on disk, and a preview you can actually see in the terminal.",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h1",
+      "kind": "honesty",
+      "text": "a cold run on a machine with ComfyUI running produces an artifact and a provenance sidecar, and the preview renders inline in a kitty-protocol terminal rather than printing a path and calling it a preview",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c2",
+      "kind": "requirement",
+      "text": "the ComfyUI adapter's template graphs already exist upstream: NVIDIA's dgx-spark-playbooks ships 8 API-format graphs under nvidia/playbook-comfyui/assets/workflow_api/ (flux-text-to-image, hidream-text-to-image, flux-controlnet, wan-text-to-video, wan-image-to-video, hunyuan-1080p-video, cosmos-video2world, flux-to-wan-pipeline) \u2014 innereye cites these as its shipped templates rather than authoring graphs from scratch",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h7",
+      "kind": "honesty",
+      "text": "the 8 playbook graphs still exist at that path and still load against the pinned ComfyUI v0.33.2 the playbook installs",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c3",
+      "kind": "requirement",
+      "text": "a recipe compiles into the playbook's flux-text-to-image.api.json by overwriting named node inputs: node 6 CLIPTextEncode.text (prompt), 25 RandomNoise.noise_seed (seed), 27 EmptySD3LatentImage.width/height, 17 BasicScheduler.steps, 16 KSamplerSelect.sampler_name, 9 SaveImage.filename_prefix \u2014 every provenance field CLAUDE.md demands is an explicit graph input, so nothing has to be inferred after the fact",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h8",
+      "kind": "honesty",
+      "text": "the node-input mapping holds for a graph innereye did not author \u2014 test it against hidream as well as flux, since node ids differ",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c4",
+      "kind": "requirement",
+      "text": "the image-input modality has a working path but needs a second endpoint: wan-image-to-video.api.json node 52 is LoadImage {\"image\": \"input_image.png\"} \u2014 a server-side FILENAME, not bytes, so the ComfyUI adapter must POST /upload/image before /prompt. Any img2img/control/last-frame recipe inherits this two-step submit",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h9",
+      "kind": "honesty",
+      "text": "POST /upload/image is actually how ComfyUI v0.33.2 accepts an image, and the returned filename is what LoadImage expects",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c5",
+      "kind": "boundary",
+      "text": "none of the 8 playbook graphs exposes an embedding input node \u2014 they are all CLIPTextEncode/LoadImage-fed. The embedding->image modality CLAUDE.md calls 'the reason this repo is worth existing' has NO template to cite from this guide and needs custom nodes (unCLIP / IPAdapter / raw CONDITIONING injection). This guide does not close that gap",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h19",
+      "kind": "honesty",
+      "text": "the adapter's capability declaration lists embedding-to-image as unsupported from day one, so asking for it fails honestly instead of falling through to a text prompt",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c8",
+      "kind": "requirement",
+      "text": "terminal preview has a concrete target here: TERM_PROGRAM=ghostty, which implements the kitty graphics protocol \u2014 so 'visualize' can mean a real inline image on this machine, with an ASCII/thumbnail fallback elsewhere, exactly as CLAUDE.md's Preview section anticipates",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h10",
+      "kind": "honesty",
+      "text": "ghostty renders the kitty graphics protocol for the artifact sizes this produces, and the fallback path is exercised on a terminal that does not",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c9",
+      "kind": "boundary",
+      "text": "the guide is not a model commitment: the quick-start page walks Z-Image-Turbo (z_image_turbo_bf16 + qwen_3_4b + ae.safetensors, ~20GB) while the same playbook's assets/ ship flux/hidream/wan/hunyuan/cosmos graphs instead. The model and graph are configuration innereye resolves, never a constant it hardcodes",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h20",
+      "kind": "honesty",
+      "text": "no model name, graph filename or resolution is a constant anywhere in innereye \u2014 all of it resolves from the operator-supplied graph and mapping",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c10",
+      "kind": "requirement",
+      "text": "the ComfyUI adapter stays stdlib-only: pyproject.toml line 16 is dependencies = [], and the ComfyUI API is HTTP+JSON (POST /prompt, `GET /history/<id>`, GET /view, POST /upload/image) which urllib.request and json cover. Expect a bandit B310 finding on urlopen \u2014 B310 is NOT in pyproject.toml bandit skips (only B101/B404/B603) \u2014 so scheme-guarded code or a justified nosec is part of the slice",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h11",
+      "kind": "honesty",
+      "text": "urllib covers every call the adapter needs including the multipart upload for images, without reaching for a dependency",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c11",
+      "kind": "boundary",
+      "text": "scan-secrets.py permits what this needs and forbids one specific thing: its endpoint check only parses files that are valid JSON and only inspects keys matching ^(base[_-]?url|endpoint|url|host)$, allowing localhost/127.0.0.1/0.0.0.0/::1. So http://127.0.0.1:8188 is safe anywhere, and NVIDIA/huggingface URLs are safe in .md and Python docstrings \u2014 but a committed template-graph or ComfyUI /history fixture .json carrying a non-local url/host key WILL fail CI",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h21",
+      "kind": "honesty",
+      "text": "any template graph or recorded ComfyUI response committed as a test fixture is checked against scripts/scan-secrets.py before it lands",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c12",
+      "kind": "requirement",
+      "text": "the CLI core absorbs a render/job verb without modification: _build_parser() has a literal 'Register your own noun groups here' spot (cli/__init__.py:88-96), and cli.py's add_subparsers(dest=..., parser_class=type(p)) at cli.py:40 is the copyable two-level template. Every subparser level must declare its own --json; the class-level _CliArgumentParser._json_hint pre-scan only affects argparse-time error rendering",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h12",
+      "kind": "honesty",
+      "text": "the new verb passes teken cli doctor . --strict, which is the only place the agent-first rubric is actually enforced",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c13",
+      "kind": "boundary",
+      "text": "_output.py has no binary and no streaming path: emit_result does a single json.dump or str() to stdout, emit_diagnostic is stderr-only strings. So artifact BYTES never flow through the output layer \u2014 they are written to disk by the verb and emit_result returns paths plus provenance. A --wait mode prints progress via emit_diagnostic and emits exactly one final payload",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h22",
+      "kind": "honesty",
+      "text": "no artifact bytes pass through emit_result, and a wait mode emits exactly one payload on stdout with all progress on stderr",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c15",
+      "kind": "requirement",
+      "text": "a render verb forces five in-repo edits in lockstep: learn.py's _TEXT command map (30-37) AND _as_json_payload()'s commands list plus its literal status string 'scaffold: no generation verb implemented yet' (65-73); explain/catalog.py's ENTRIES plus _ROOT's ## Verbs list and its scaffold line (27-39); overview.py's _VERBS (27-33); a new hand-written test pair; and a CHANGELOG entry with a version bump",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h13",
+      "kind": "honesty",
+      "text": "all five edits land in the same commit as the verb, so no intermediate commit ships a CLI whose learn output contradicts its own command surface",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c17",
+      "kind": "requirement",
+      "text": "the prose blast radius is five files with a near-verbatim false sentence: README.md:18-20, CLAUDE.md:20-25, AGENTS.override.md:29-33, AGENTS.colleague.md:38-41 and QWEN.md:19-22 each say 'no render verb, no backend adapter, no job store'. .pi/SYSTEM.md is the one root prompt file with NO domain prose and stays untouched. Plus 13 'visual output surface' occurrences to leave consistent",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h14",
+      "kind": "honesty",
+      "text": "the five prose files agree with each other after the sweep, not merely each with the code",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c19",
+      "kind": "boundary",
+      "text": "publish.yml is path-filtered to pyproject.toml and innereye/** \u2014 so the very first commit that adds innereye/backends/comfyui.py triggers a REAL TestPyPI upload of `<version>.dev<run_number>` on the PR, and a real PyPI upload on merge. Version numbers are spent on both indexes, irreversibly, from the first adapter commit onward",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h23",
+      "kind": "honesty",
+      "text": "the version bump and the TestPyPI upload it spends are accepted deliberately on the first adapter commit, not discovered at PR time",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c20",
+      "kind": "requirement",
+      "text": "visualize resolves to the full render path \u2014 recipe, job, artifact on disk, provenance \u2014 and the artifact is an IMAGE OR A VIDEO. Both media types are first-class from the first slice, not image-now-video-later.",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h15",
+      "kind": "honesty",
+      "text": "the video half is genuinely exercised in the first slice and not deferred, since deferring it is how image-only assumptions get baked into the recipe type",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c21",
+      "kind": "requirement",
+      "text": "the template graph is operator-supplied: render takes a graph path plus the declared recipe-field-to-node-input mapping. innereye ships no default graph and does not silently pick one.",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h16",
+      "kind": "honesty",
+      "text": "omitting --graph produces an honest error naming how to get one, and never silently falls back to a bundled or downloaded default",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c22",
+      "kind": "requirement",
+      "text": "there is a seam that can fetch a template graph rather than requiring a local file, exercised as a DEMO path \u2014 not the default, and not a hidden fallback when --graph is omitted.",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h17",
+      "kind": "honesty",
+      "text": "the demo download is opt-in and visibly distinct from the operator-supplied path, so nobody ships a pipeline that silently depends on raw.githubusercontent.com being reachable",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c23",
+      "kind": "requirement",
+      "text": "video params are ordinary recipe fields, not a special case: length and fps are explicit node inputs (wan-t2v node 40 EmptyHunyuanLatentVideo length 81, node 28 SaveAnimatedWEBP fps 16; hunyuan 1920x1056 length 49 fps 24) \u2014 the same flat node-input mapping that covers image params covers video, so one recipe compiler handles both",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h18",
+      "kind": "honesty",
+      "text": "one recipe compiler really does cover both media without a media-type branch inside it, with the branch confined to output collection",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c25",
+      "kind": "boundary",
+      "text": "the operator-supplied graph is a PAIR, not a file: a template graph is inert without a declared mapping from recipe fields to node input paths (prompt -> 6.inputs.text, seed -> 25.inputs.noise_seed differ per graph \u2014 hidream saves at node 12, flux at node 9). So --graph must be accompanied by a mapping, and the demo seam supplies both together",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h24",
+      "kind": "honesty",
+      "text": "the mapping format is agreed as part of the graph contract and is not an innereye-private invention that no other tool can produce",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c26",
+      "kind": "audience",
+      "text": "an agent on the mesh that needs a picture or a clip and cannot produce one, plus the human operator who provisioned ComfyUI on the DGX Spark and wants to see the result without leaving the terminal",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h2",
+      "kind": "honesty",
+      "text": "both readers are actually served: the --json payload carries everything an agent needs to continue without parsing prose, and the text mode is legible to the operator without --json",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c27",
+      "kind": "before_state",
+      "text": "agents can reason about images but cannot make one. innereye on disk today is six introspection verbs (whoami, learn, explain, overview, doctor, cli overview) and nothing else \u2014 a request for a picture dead-ends, and five root prompt files say so in as many words",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h3",
+      "kind": "honesty",
+      "text": "the six-verb inventory and the five stale prose sentences are still accurate at implementation time, not just at scoping time",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c28",
+      "kind": "after_state",
+      "text": "innereye render --prompt TEXT --graph PATH submits a job to a local ComfyUI and returns a handle; innereye job fetch ID writes an image or a video artifact to a predictable path with a provenance JSON beside it; a preview flag draws it inline where the terminal supports it",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h4",
+      "kind": "honesty",
+      "text": "submit and fetch genuinely survive process exit \u2014 a job submitted in one invocation is collectable by a separate later process, not just by a long-lived one",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c29",
+      "kind": "why_it_matters",
+      "text": "the mesh gets a visual artifact that is reproducible rather than merely described: seed, graph, model, sampler and the full recipe are recorded at generation time, so any result can be re-run, diffed or reviewed instead of taken on trust",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h5",
+      "kind": "honesty",
+      "text": "the recorded seed is one innereye chose and wrote into the graph, never a value read back from a backend default after the fact",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c30",
+      "kind": "success_signal",
+      "text": "re-running a recorded provenance JSON reproduces a byte-identical artifact in at least 1 repeat run; the dry-run default prints the compiled recipe and resolved backend in under 1 second having spent 0 GPU seconds; and a capability mismatch exits non-zero naming an alternative backend in 100 percent of cases rather than rendering something approximate",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h6",
+      "kind": "honesty",
+      "text": "byte-identical reproduction actually holds on this hardware \u2014 non-determinism in the sampler or in cuDNN kernel selection would make this claim false and it must be tested, not assumed",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c31",
+      "kind": "requirement",
+      "text": "ComfyUI validates missing weights AT SUBMIT, so innereye must not reimplement it: POST /prompt with a graph naming absent weights returns a structured prompt_outputs_failed_validation with node_errors keyed by node id, giving type value_not_in_list, the input_name, the received_value and the full list of valid values. That is a better error than a client-side /object_info pre-flight could construct. innereye's job is to SURFACE that payload as CliError.remediation, not to duplicate the check. (Verified live against 127.0.0.1:8188 on 2026-09-16.) The guide's two halves still do not match \u2014 setup.sh fetches Z-Image-Turbo while the 8 api graphs need a separate 70-230GB model set \u2014 which is what makes this failure path common enough to matter",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h25",
+      "kind": "honesty",
+      "text": "a missing-weights failure is caught before submit and reports the missing filename, rather than surfacing as an opaque ComfyUI execution error after the job is queued",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c34",
+      "kind": "requirement",
+      "text": "the spec models jobs on the WRONG ComfyUI API: c10 assumes POST /prompt + `GET /history/<id>` polling, but the pinned v0.33.2 exposes a first-class jobs API \u2014 GET /api/jobs (filterable, sortable, paginated), `GET /api/jobs/{job_id}`, `POST /api/jobs/{job_id}/cancel`, POST /api/jobs/cancel \u2014 whose live status enum is pending, in_progress, completed, failed, CANCELLED (five states; the server's own 400 on an invalid filter enumerates them). /history cannot distinguish queued from running from failed; /api/jobs can. (Verified live on 127.0.0.1:8188.)",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h26",
+      "kind": "honesty",
+      "text": "the /api/jobs endpoints exist and behave as documented on the running v0.33.2 server, not merely in its source",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c35",
+      "kind": "requirement",
+      "text": "the job lifecycle in the spec is happy-path only: submit / status / fetch has no CANCEL and no FAILED terminal state, yet the server exposes POST /interrupt, POST /api/jobs/{id}/cancel and POST /api/jobs/cancel, and JobStatus includes failed. An agent that submits a multi-minute video render and changes its mind, or whose job dies in the sampler, has no verb and no defined exit code",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h27",
+      "kind": "honesty",
+      "text": "a failed ComfyUI job surfaces to the caller as a non-zero exit with the server's error text, never as an empty successful fetch",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c36",
+      "kind": "boundary",
+      "text": "ComfyUI has NO authentication: comfy/cli_args.py offers --tls-keyfile/--tls-certfile but no auth flag of any kind, and the playbook launch.sh runs python main.py --listen 0.0.0.0, binding every interface. On this machine that is the WiFi LAN. Anyone on the network can queue work on the GB10, read GET /history for every prompt ever run, and GET /view any output. innereye must document this and default its own guidance to --listen 127.0.0.1",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h28",
+      "kind": "honesty",
+      "text": "innereye never tells an operator to bind 0.0.0.0 without stating the exposure, and its own default endpoint stays loopback",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c37",
+      "kind": "requirement",
+      "text": "every render leaves TWO copies and innereye owns only one: SaveImage writes into ComfyUI's own output dir via folder_paths.get_save_image_path with an auto-incrementing counter (nodes.py:1694), so the server accumulates prefix_00001_.png forever while innereye copies bytes out via /view to its own predictable path. Nothing cleans the server-side copy; on a box already holding 70GB of weights that is unbounded growth nobody owns",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h29",
+      "kind": "honesty",
+      "text": "innereye either documents the server-side accumulation as the operator's to manage, or offers an explicit cleanup \u2014 it must not silently imply its own artifact path is the only copy",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c38",
+      "kind": "boundary",
+      "text": "the artifact ALREADY carries the full recipe before innereye writes a sidecar: SaveImage injects metadata.add_text('prompt', json.dumps(prompt)) plus extra_pnginfo into the PNG (nodes.py:1700-1704), and the WebP path calls _create_webp_metadata and saves it as EXIF (comfy_api/latest/_ui.py). Good for provenance and a clean result for both media \u2014 but it means sharing a render SHARES THE PROMPT AND THE WHOLE GRAPH, which no claim states. An agent attaching a render to a PR leaks its prompt",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h30",
+      "kind": "honesty",
+      "text": "the embedded-metadata behaviour is stated wherever innereye tells an agent to share or post an artifact, and a strip option exists or its absence is deliberate",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c39",
+      "kind": "requirement",
+      "text": "a predictable artifact path is a DESTRUCTIVE path: the spec promises predictable paths and records the seed, so re-running the same recipe with the same seed resolves to the same filename and silently overwrites the earlier artifact and its provenance sidecar \u2014 destroying the very evidence the reproducibility claim depends on. Writes must be collision-safe or refuse to clobber without an explicit flag",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h31",
+      "kind": "honesty",
+      "text": "a second render that would land on an existing artifact path either refuses with a non-zero exit or writes a distinct path \u2014 it never overwrites a prior artifact or sidecar in place",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "c40",
+      "kind": "requirement",
+      "text": "the job store has no declared home or concurrency story: c28's honesty condition demands a job submitted in one process be collectable by another, which makes the store shared mutable state \u2014 but no claim says where it lives (CWD-relative? XDG? repo-local?), what happens when two innereye processes submit at once, or how pytest -n auto avoids colliding on it. ComfyUI's own queue is a second, external store that can disagree with it after a server restart invalidates a prompt_id",
+      "deferred": false,
+      "deferred_reason": ""
+    },
+    {
+      "id": "h32",
+      "kind": "honesty",
+      "text": "two concurrent submits produce two distinct, both-collectable job records, and a job whose prompt_id the server no longer knows reports a distinct recoverable state rather than hanging or crashing",
+      "deferred": false,
+      "deferred_reason": ""
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "summary": "recipe type and the operator-supplied graph+mapping contract",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "innereye/recipe.py defines a backend-independent Recipe(task, inputs, params) covering both image and video tasks with one compile path",
+        "a GraphMapping maps recipe fields to node input paths; compiling the same recipe against flux-text-to-image and hidream-text-to-image lands identical fields on different node ids",
+        "a graph supplied without a mapping is refused with a non-zero exit naming what is missing; innereye never guesses node ids",
+        "length and fps are ordinary recipe params, not a video-specific branch"
+      ],
+      "deps": [],
+      "covers": [
+        "c3",
+        "h8",
+        "c20",
+        "h15",
+        "c21",
+        "h16",
+        "c23",
+        "h18",
+        "c25",
+        "h24"
+      ],
+      "instruction": "start from the 8 playbook graphs already analysed in the spec. Node ids are NOT stable across graphs, so the mapping is part of the contract, not an inference. Keep this module free of any HTTP or ComfyUI import \u2014 it is the portable layer."
+    },
+    {
+      "id": "t2",
+      "summary": "stdlib-only HTTP transport with a scheme guard",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "innereye/backends/_http.py performs GET/POST-JSON/multipart-upload/byte-download using only urllib.request and json; pyproject dependencies stays []",
+        "urlopen is wrapped by an explicit http/https scheme guard so bandit B310 passes without a blanket nosec",
+        "no artifact bytes pass through _output.py; the transport returns bytes and the caller writes files",
+        "a transport pointed at an unreachable server raises CliError with an environment exit code, never a traceback"
+      ],
+      "deps": [],
+      "covers": [
+        "c10",
+        "h11",
+        "c13",
+        "h22"
+      ],
+      "instruction": "multipart upload is the one place a dependency might tempt you \u2014 hand-roll it with the stdlib and record why if you cannot. Verified live: POST /upload/image returns {name, subfolder, type}."
+    },
+    {
+      "id": "t3",
+      "summary": "capability declaration and honest-refusal negotiation",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "innereye/backends/__init__.py defines an adapter protocol where each adapter DECLARES its supported tasks and input modalities",
+        "embedding-to-image is declared unsupported from day one and a recipe requesting it fails with a non-zero exit naming a backend that could, never a text-prompt downgrade",
+        "no model name, graph filename or resolution appears as a constant anywhere in innereye"
+      ],
+      "deps": [],
+      "covers": [
+        "c5",
+        "h19",
+        "c9",
+        "h20"
+      ],
+      "instruction": "build the negotiation mechanism NOW even though one backend needs no negotiation \u2014 retrofitting it later means rewriting every verb. The embedding refusal test must exist before any embedding support does."
+    },
+    {
+      "id": "t4",
+      "summary": "versioned, concurrency-safe job store that survives process exit",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "innereye/jobs.py declares where the store lives and writes a schema_version field from the first release",
+        "a job submitted by one process is collectable by a separate later process; killing the submitter between submit and fetch does not lose the job",
+        "two concurrent submits produce two distinct, both-collectable records",
+        "a job whose prompt_id the server no longer knows reports a distinct recoverable state rather than hanging or crashing",
+        "the store is safe under pytest -n auto"
+      ],
+      "deps": [],
+      "covers": [
+        "c28",
+        "h4",
+        "c40",
+        "h32"
+      ],
+      "instruction": "this is innereye's FIRST on-disk format \u2014 the challenge pass flagged that the next change inherits a migration problem if it ships without a version field. ComfyUI's queue is a second store that can disagree after a restart; reconcile explicitly."
+    },
+    {
+      "id": "t5",
+      "summary": "provenance sidecar and collision-safe artifact paths",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "innereye/provenance.py writes a sidecar carrying backend, model, seed, resolution, sampler, steps, container and the full recipe",
+        "the seed is chosen by innereye and asserted present in the SUBMITTED graph payload, not read back from a backend default",
+        "a write that would land on an existing artifact or sidecar refuses with a non-zero exit unless an explicit overwrite flag is passed; rendering the same recipe and seed twice does not destroy the first result",
+        "the container (webp for video, png for image) is recorded explicitly"
+      ],
+      "deps": [],
+      "covers": [
+        "c29",
+        "h5",
+        "c39",
+        "h31",
+        "c38",
+        "h30"
+      ],
+      "instruction": "the challenge pass found that predictable-paths plus seed-naming silently overwrites the evidence the reproducibility claim depends on. Collision safety is the fix. Also note ComfyUI already embeds the prompt in PNG text chunks and WebP EXIF \u2014 document that artifacts are self-disclosing when shared."
+    },
+    {
+      "id": "t6",
+      "summary": "terminal preview with kitty protocol and an honest fallback",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "innereye/preview.py renders an artifact inline via the kitty graphics protocol where the terminal supports it",
+        "under TERM=dumb or a non-supporting terminal it falls back to an ASCII or thumbnail rendering and says which it used",
+        "preview never prints only a path and calls it a preview"
+      ],
+      "deps": [],
+      "covers": [
+        "c8",
+        "h10"
+      ],
+      "instruction": "ghostty is the local target and implements kitty graphics. Detect capability, do not assume it. The fallback path must be exercised in tests, not just present."
+    },
+    {
+      "id": "t7",
+      "summary": "ComfyUI adapter: compile, submit, poll, cancel, collect",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "innereye/backends/comfyui.py compiles a Recipe into a template graph and submits it via POST /prompt",
+        "the job model targets /api/jobs first and falls back to /history only when that endpoint 404s; all five states round-trip: pending, in_progress, completed, failed, cancelled",
+        "cancel is wired to POST /api/jobs/{id}/cancel and failed carries the server error text out as a non-zero exit",
+        "a graph naming absent weights surfaces ComfyUI's node_errors payload (input_name, received_value, valid list) as CliError.remediation without a client-side /object_info pre-flight",
+        "image inputs POST /upload/image first and feed the returned name to LoadImage",
+        "everything goes over HTTP; the adapter never reads ComfyUI's output or models directory from the local filesystem, so a remote server works unchanged"
+      ],
+      "deps": [
+        "t1",
+        "t2",
+        "t3"
+      ],
+      "covers": [
+        "c2",
+        "h7",
+        "c4",
+        "h9",
+        "c31",
+        "h25",
+        "c34",
+        "h26",
+        "c35",
+        "h27",
+        "c37",
+        "h29"
+      ],
+      "instruction": "all of this was verified live against 127.0.0.1:8188 running ComfyUI 0.33.2 \u2014 see the spec's Scope exploration entries for the exact responses. Do NOT reimplement weight validation: the server already fails closed at submit with a better error than you can construct. Document that ComfyUI keeps its own auto-incrementing copy under its output dir that innereye does not clean."
+    },
+    {
+      "id": "t8",
+      "summary": "render verb, dry-run by default, with the demo graph seam",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "innereye render is dry-run by default and prints the compiled recipe and resolved backend; --apply commits",
+        "a dry run spends zero GPU seconds and makes no submission",
+        "omitting --graph produces an honest error naming how to obtain one; it never falls back to a bundled or downloaded default",
+        "the demo download seam is a separately named invocation, and the default path never touches the network",
+        "render takes --json and --preview"
+      ],
+      "deps": [
+        "t7",
+        "t5",
+        "t6"
+      ],
+      "covers": [
+        "c22",
+        "h17"
+      ],
+      "instruction": "the demo seam fetches the NVIDIA playbook graph, which needs tier-1 FLUX weights \u2014 document that prerequisite. Keep the demo visibly distinct from the operator-supplied path so nobody ships a pipeline silently depending on raw.githubusercontent.com."
+    },
+    {
+      "id": "t9",
+      "summary": "job noun group: submit, status, fetch, cancel, overview",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "innereye/cli/_commands/job.py registers a two-level noun group copying cli.py's parser_class=type(p) pattern",
+        "every level declares its own --json, including each sub-verb",
+        "job overview exists, because a noun with action-verbs must expose one",
+        "uv run teken cli doctor . --strict passes",
+        "long work returns a job handle; a --wait mode emits progress on stderr and exactly one payload on stdout"
+      ],
+      "deps": [
+        "t4",
+        "t7"
+      ],
+      "covers": [
+        "c12",
+        "h12"
+      ],
+      "instruction": "the rubric is only enforced by teken cli doctor --strict, not by pytest \u2014 run it before opening the PR, not after. _dispatch gives you no timeout or signal plumbing, so --wait owns its own SIGINT handling."
+    },
+    {
+      "id": "t10",
+      "summary": "fixtures and the committed-JSON secrets gate",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "any template graph or recorded ComfyUI response committed as a test fixture passes python3 scripts/scan-secrets.py",
+        "no fixture carries a non-local url/host/endpoint/baseUrl key",
+        "the ComfyUI HTTP layer is mocked in tests; no test requires a live server, and none binds a fixed port under pytest -n auto"
+      ],
+      "deps": [
+        "t7"
+      ],
+      "covers": [
+        "c11",
+        "h21"
+      ],
+      "instruction": "verified: the endpoint gate only parses files that are valid JSON and only inspects those four key names, so markdown and Python are unaffected \u2014 but a committed graph or /history fixture is exactly the JSON case. Run scan-secrets on fixture paths as you write them."
+    },
+    {
+      "id": "t11",
+      "summary": "register the verbs and sweep the in-repo enumerations in lockstep",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "cli/__init__.py registers render and job at the marked spot; learn.py's _TEXT command map AND _as_json_payload commands list both gain them",
+        "learn.py's literal status string 'scaffold: no generation verb implemented yet' is gone, and learn stays over 200 chars mentioning purpose, command map, exit codes, --json and explain",
+        "explain/catalog.py gains entries for render and job, and _ROOT's ## Verbs list and scaffold line are updated",
+        "overview.py's _VERBS list includes the new verbs",
+        "a NEW generic test walks the registered argparse tree and asserts every command has a catalog entry and a --json flag \u2014 the gap the challenge pass found",
+        "all five edits land in the SAME commit, so no intermediate commit ships a CLI whose learn output contradicts its own command surface"
+      ],
+      "deps": [
+        "t8",
+        "t9"
+      ],
+      "covers": [
+        "c15",
+        "h13",
+        "c26",
+        "h2",
+        "c27",
+        "h3"
+      ],
+      "instruction": "three code modules carry hand-maintained verb enumerations and two carry a status string that a render verb makes false. Nothing in pytest catches an unregistered verb today \u2014 that is why the generic introspection test is an acceptance criterion here, not a nice-to-have."
+    },
+    {
+      "id": "t12",
+      "summary": "sweep the five prose surfaces and state the ComfyUI exposure",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "README.md:18, CLAUDE.md:20, AGENTS.override.md:29, AGENTS.colleague.md:38 and QWEN.md:19 no longer claim there is no render verb; .pi/SYSTEM.md is untouched",
+        "the five edited passages agree with each other, not merely each with the code",
+        "the 13 'visual output surface' occurrences remain consistent",
+        "every documented endpoint and example defaults to 127.0.0.1, and wherever innereye tells an operator to launch ComfyUI it states the server has no authentication and that --listen 0.0.0.0 exposes the GPU and all prior prompts to the LAN",
+        "anything still unbuilt (embeddings, a second adapter) is marked (planned)"
+      ],
+      "deps": [
+        "t11"
+      ],
+      "covers": [
+        "c17",
+        "h14",
+        "c36",
+        "h28"
+      ],
+      "instruction": "nothing in CI checks prose agreement \u2014 harness-smoke verifies file presence and registry wiring only. Read the five edited passages side by side by hand. git grep -niF 'visual output surface' is the sweep command."
+    },
+    {
+      "id": "t13",
+      "summary": "version bump, changelog, and the deliberate index spend",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "the version is bumped in the SAME commit that first adds a file under innereye/, via the version-bump skill",
+        "CHANGELOG.md gains a Keep-a-Changelog entry documenting the new verbs and the retraction of the five scaffold claims",
+        "the version-check CI job passes"
+      ],
+      "deps": [
+        "t12"
+      ],
+      "covers": [
+        "c19",
+        "h23"
+      ],
+      "instruction": "publish.yml is path-filtered to innereye/** so the first adapter commit triggers a REAL TestPyPI upload of `<version>.dev<run_number>`, and merge publishes to PyPI. A version number is spent on both indexes irreversibly \u2014 accept that deliberately at commit time, not discover it at PR time."
+    },
+    {
+      "id": "t14",
+      "summary": "live acceptance: one image and one video against the running server",
+      "origin": "llm",
+      "status": "confirmed",
+      "acceptance_criteria": [
+        "one image render and one video render both produce artifacts against ComfyUI on 127.0.0.1:8188 with tier-1 weights \u2014 the video half is NOT deferred",
+        "the preview renders a visible picture in ghostty; the acceptance is a visible image, not a successful HTTP 200",
+        "re-running a recorded provenance JSON reproduces a byte-identical artifact over at least 1 repeat run, OR the success signal is reworded with evidence that sampler/cuDNN non-determinism makes byte-identity unachievable on GB10",
+        "a dry run prints the compiled recipe and resolved backend in under 1 second having spent 0 GPU seconds",
+        "a capability mismatch exits non-zero naming an alternative backend"
+      ],
+      "deps": [
+        "t13"
+      ],
+      "covers": [
+        "c1",
+        "h1",
+        "c30",
+        "h6"
+      ],
+      "instruction": "byte-identical reproduction may simply not hold on this hardware \u2014 run the same recipe twice and hash both artifacts BEFORE committing to that success signal. If it fails, reword the claim with the evidence rather than quietly dropping it."
+    }
+  ],
+  "risks": [
+    {
+      "id": "r1",
+      "text": "embedding-to-image needs custom ComfyUI nodes (unCLIP / IPAdapter) that no playbook graph provides; the capability mechanism must accept it later without rewriting every verb",
+      "kind": "out_of_scope",
+      "task_id": null,
+      "resolved": false,
+      "resolution": ""
+    },
+    {
+      "id": "r2",
+      "text": "the exit-code policy reserves 3+ but defines nothing, so backend-unreachable lands as 2 (environment); whether to spend a new code is undecided and affects every adapter error path",
+      "kind": "unknown_nonblocking",
+      "task_id": null,
+      "resolved": false,
+      "resolution": ""
+    },
+    {
+      "id": "r3",
+      "text": "per-step progress for --wait is websocket-only in ComfyUI, which the stdlib-only rule makes expensive; polling /api/jobs gives state transitions but not progress",
+      "kind": "unknown_nonblocking",
+      "task_id": null,
+      "resolved": false,
+      "resolution": ""
+    },
+    {
+      "id": "r4",
+      "text": "t14 cannot run until the tier-1 weights finish downloading; the FLUX VAE also depends on a license acceptance that is done but untested end-to-end",
+      "kind": "unknown_nonblocking",
+      "task_id": "t14",
+      "resolved": false,
+      "resolution": ""
+    }
+  ],
+  "obligations": []
+}

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import argparse as _argparse
 import json
 
 import pytest
 
-from innereye.cli import main
+from innereye.cli import _build_parser, main
+from innereye.explain.catalog import ENTRIES
 
 # --- overview -------------------------------------------------------------
 
@@ -104,3 +106,61 @@ def test_doctor_recognizes_declared_backend(capsys: pytest.CaptureFixture[str]) 
     assert "unknown backend" not in messages
     assert rc == 0
     assert payload["healthy"] is True
+
+
+# --- generic surface consistency (added with the render/job verbs) -----------
+#
+# The challenge pass found that NOTHING mechanically checked that a registered
+# command has a catalog entry or a --json flag: the only generic gate walked
+# catalog.ENTRIES outward, never the argparse tree inward. These tests close
+# that gap, so a future verb cannot ship half-registered.
+
+
+def _walk(parser, path=()):
+    """Yield (path, parser) for every registered command and sub-command."""
+    for action in parser._actions:
+        if isinstance(action, _argparse._SubParsersAction):
+            for name, subparser in action.choices.items():
+                here = path + (name,)
+                yield here, subparser
+                yield from _walk(subparser, here)
+
+
+def _registered_paths():
+    return [path for path, _ in _walk(_build_parser())]
+
+
+def test_every_registered_command_has_a_catalog_entry() -> None:
+    missing = [p for p in _registered_paths() if p not in ENTRIES]
+    assert not missing, f"registered but not in explain catalog: {missing}"
+
+
+def test_every_registered_command_accepts_json() -> None:
+    """argparse does not inherit --json; every level must declare its own."""
+    offenders = []
+    for path, parser in _walk(_build_parser()):
+        flags = {opt for action in parser._actions for opt in action.option_strings}
+        if "--json" not in flags:
+            offenders.append(path)
+    assert not offenders, f"commands missing --json: {offenders}"
+
+
+def test_every_noun_with_action_verbs_exposes_overview() -> None:
+    """The rubric's overview_cli_noun_exists check, asserted in pytest too."""
+    parser = _build_parser()
+    for path, subparser in _walk(parser):
+        children = {
+            name
+            for action in subparser._actions
+            if isinstance(action, _argparse._SubParsersAction)
+            for name in action.choices
+        }
+        if children:
+            assert "overview" in children, f"noun {path} has verbs {children} but no overview"
+
+
+def test_render_and_job_are_registered() -> None:
+    paths = _registered_paths()
+    assert ("render",) in paths
+    for verb in ("overview", "status", "fetch", "cancel"):
+        assert ("job", verb) in paths

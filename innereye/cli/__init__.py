@@ -65,8 +65,10 @@ def _build_parser() -> argparse.ArgumentParser:
     from innereye.cli._commands import cli as _cli_group
     from innereye.cli._commands import doctor as _doctor_cmd
     from innereye.cli._commands import explain as _explain_cmd
+    from innereye.cli._commands import job as _job_group
     from innereye.cli._commands import learn as _learn_cmd
     from innereye.cli._commands import overview as _overview_cmd
+    from innereye.cli._commands import render as _render_cmd
     from innereye.cli._commands import whoami as _whoami_cmd
 
     parser = _CliArgumentParser(
@@ -91,6 +93,8 @@ def _build_parser() -> argparse.ArgumentParser:
     _overview_cmd.register(sub)
     _doctor_cmd.register(sub)
     _cli_group.register(sub)
+    _render_cmd.register(sub)
+    _job_group.register(sub)
     # Register your own noun groups here:
     #   from innereye.cli._commands import my_noun as _my_noun_group
     #   _my_noun_group.register(sub)

@@ -25,6 +25,8 @@ _ARTIFACTS = [
 ]
 
 _VERBS = [
+    "render — render an image or video from a recipe (dry-run by default)",
+    "job overview|status|fetch|cancel — follow up submitted render jobs",
     "whoami — identity probe (nick, version, backend, model)",
     "learn — structured self-teaching prompt",
     "explain <path> — markdown docs for a topic",

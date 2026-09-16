@@ -35,11 +35,15 @@ update this section so the docs keep matching what's actually on disk.
 CLI that renders and previews images and videos from **text, image, or
 embedding** inputs, starting with a ComfyUI backend but not locked to it.
 
-**The domain is not implemented yet.** On disk today there is only the
-`culture-agent-template` scaffold — the six agent-first verbs, four harness
-prompt files, the vendored skill kit, and CI. No `render` verb, no backend
-adapter, no job store. The intended design is in
+**The domain is implemented for ComfyUI.** `render` and the `job` noun group
+ship: a portable recipe compiles into an operator-supplied template graph,
+submits as a job, and `job fetch` writes the artifact plus provenance. Verified
+on a DGX Spark (FLUX.1-dev, 1024x1024, ~47s, byte-identical seed repeat). Still
+`(planned)`: a second adapter and embedding inputs — declared unsupported and
+refused, never approximated. Design detail in
 [issue #1](https://github.com/agentculture/innereye/issues/1) and `CLAUDE.md`.
+
+ComfyUI has no authentication; innereye defaults to loopback.
 
 `CLAUDE.md` is written for a Claude Code session working *on* the repo — it is
 not your runtime prompt, but it is the fullest write-up of both the domain

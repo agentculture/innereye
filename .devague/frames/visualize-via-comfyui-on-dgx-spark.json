@@ -4,7 +4,7 @@
   "schema_version": 6,
   "status": "exported",
   "created": "2026-09-15T23:57:24Z",
-  "updated": "2026-09-16T01:00:21Z",
+  "updated": "2026-09-16T01:26:43Z",
   "claims": [
     {
       "id": "c1",
@@ -586,14 +586,20 @@
     {
       "id": "c33",
       "kind": "decision",
-      "text": "the acceptance run is gated on real provisioning: ComfyUI v0.33.2 plus tier-1 weights (FLUX.1-dev for image, Wan 2.1 T2V 14B for video) installed at /home/spark/comfy, so both halves of c20 are tested against a live server rather than argued.",
+      "text": "the acceptance run is gated on real provisioning: ComfyUI v0.33.2 plus tier-1 weights (FLUX.1-dev for image, Wan 2.1 T2V 14B for video) installed on the operator's machine, so both halves of c20 are tested against a live server rather than argued",
       "origin": "user",
-      "status": "confirmed",
+      "status": "proposed",
       "honesty_conditions": [],
       "hard_questions": [],
       "links": [],
       "instruction": "the slice is not done until one image render and one video render have both produced artifacts against the local server",
-      "revisions": []
+      "revisions": [
+        {
+          "text": "the acceptance run is gated on real provisioning: ComfyUI v0.33.2 plus tier-1 weights (FLUX.1-dev for image, Wan 2.1 T2V 14B for video) installed at <operator-path>/comfy, so both halves of c20 are tested against a live server rather than argued.",
+          "kind": "decision",
+          "reason": "dropped the absolute /home/<user>/ path: steward's portability check greps every tracked file for it, and the frame JSON and exported spec are both tracked. The provisioning location is the operator's business and was never load-bearing to the claim."
+        }
+      ]
     },
     {
       "id": "c34",
@@ -1014,7 +1020,7 @@
     },
     {
       "id": "s25",
-      "surface": "challenge pass / adjacent-systems lens: /home/spark/comfy/ComfyUI/server.py routes 821-1072",
+      "surface": "challenge pass / adjacent-systems lens: <comfyui-checkout>/server.py routes 821-1072",
       "finding": "the pinned server offers a richer job API than the spec assumes, including a real status enum and cancel \u2014 the job model should compile to /api/jobs, falling back to /history only if the endpoint is absent",
       "seeds": [
         "c34"

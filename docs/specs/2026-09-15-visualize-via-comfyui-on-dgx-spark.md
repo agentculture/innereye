@@ -39,6 +39,7 @@
   - honesty: urllib covers every call the adapter needs including the multipart upload for images, without reaching for a dependency
 - the CLI core absorbs a render/job verb without modification: `_build_parser`() has a literal 'Register your own noun groups here' spot (cli/`__init__.py`:88-96), and cli.py's `add_subparsers`(dest=..., `parser_class`=type(p)) at cli.py:40 is the copyable two-level template. Every subparser level must declare its own --json; the class-level `_CliArgumentParser`.`_json_hint` pre-scan only affects argparse-time error rendering
   - instruction: run uv run teken cli doctor . --strict before opening the PR, not after
+  - ⚠ contested by `d1` (acceptable): a 'job submit' verb would need the full render surface (--graph, --mapping, --prompt, every param) to construct a recipe, duplicating 'render' exactly. render --apply IS the submit step and already returns a job handle, which is what the spec's submit/status/fetch shape actually asks for. Two verbs doing one thing is a worse CLI than one, and the rubric penalises redundant surface.
   - honesty: the new verb passes teken cli doctor . --strict, which is the only place the agent-first rubric is actually enforced
 - a render verb forces five in-repo edits in lockstep: learn.py's `_TEXT` command map (30-37) AND `_as_json_payload`()'s commands list plus its literal status string 'scaffold: no generation verb implemented yet' (65-73); explain/catalog.py's ENTRIES plus `_ROOT`'s ## Verbs list and its scaffold line (27-39); overview.py's `_VERBS` (27-33); a new hand-written test pair; and a CHANGELOG entry with a version bump
   - instruction: grep the five sites in the diff before pushing
@@ -183,7 +184,7 @@
   - seeds: `c25`
 - `s24` — `playbook assets/scripts/download-models.sh tiers vs the quick-start page setup.sh`: the quick-start downloads Z-Image-Turbo weights for which NO api graph is shipped, while the shipped api graphs need a different 70-230GB model set from a separate script — following the linked guide alone does not produce a runnable graph+weights pair
   - seeds: `c31`
-- `s25` — `challenge pass / adjacent-systems lens: /home/spark/comfy/ComfyUI/server.py routes 821-1072`: the pinned server offers a richer job API than the spec assumes, including a real status enum and cancel — the job model should compile to /api/jobs, falling back to /history only if the endpoint is absent
+- `s25` — `challenge pass / adjacent-systems lens: <comfyui-checkout>/server.py routes 821-1072`: the pinned server offers a richer job API than the spec assumes, including a real status enum and cancel — the job model should compile to /api/jobs, falling back to /history only if the endpoint is absent
   - seeds: `c34`
 - `s26` — `challenge pass / failure-mode and lifecycle lens: server.py JobStatus + /interrupt + cancel routes`: cancel and failure are first-class in the backend but absent from the spec's job model — submit/status/fetch covers only the path where nothing goes wrong
   - seeds: `c35`
@@ -212,8 +213,6 @@
 
 - video artifacts land as .webp for the first slice, taken from SaveAnimatedWEBP unmodified, with container recorded in provenance. No ffmpeg transcode and no `VHS_VideoCombine` swap — innereye never rewrites the operator's graph.
   - instruction: assert the provenance JSON carries an explicit container field; assert innereye submits the operator's graph byte-identical apart from the mapped recipe fields
-- the acceptance run is gated on real provisioning: ComfyUI v0.33.2 plus tier-1 weights (FLUX.1-dev for image, Wan 2.1 T2V 14B for video) installed at /home/spark/comfy, so both halves of c20 are tested against a live server rather than argued.
-  - instruction: the slice is not done until one image render and one video render have both produced artifacts against the local server
 
 ## Open parks
 

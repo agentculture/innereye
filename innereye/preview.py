@@ -119,11 +119,11 @@ def decode_png(data: bytes) -> tuple[int, int, list[tuple[int, int, int]]] | Non
     if len(raw) < (stride + 1) * height:
         return None
 
-    return width, height, _scanlines_to_rgb(raw, width, height, stride, channels)
+    return width, height, _scanlines_to_rgb(raw, height, stride, channels)
 
 
 def _scanlines_to_rgb(
-    raw: bytes, width: int, height: int, stride: int, channels: int
+    raw: bytes, height: int, stride: int, channels: int
 ) -> list[tuple[int, int, int]]:
     """Unfilter each scanline and flatten it to RGB triples."""
     pixels: list[tuple[int, int, int]] = []

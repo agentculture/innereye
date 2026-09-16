@@ -136,27 +136,35 @@ def describe_graph(compiled: Mapping[str, Any]) -> dict[str, Any]:
     values back out of the graph after compilation, so the sidecar describes
     the artifact rather than the command line.
     """
-    models: list[str] = []
-    sampling: dict[str, Any] = {}
-    size: dict[str, Any] = {}
-
+    found: dict[str, Any] = {"models": [], "sampling": {}, "size": {}}
     for node in compiled.values():
-        if not isinstance(node, dict):
-            continue
-        inputs = node.get("inputs") or {}
-        if not isinstance(inputs, dict):
-            continue
-        for key, value in inputs.items():
-            if isinstance(value, list):
-                continue  # a wire to another node, not a literal
-            if key in _MODEL_INPUTS and isinstance(value, str) and value not in models:
-                models.append(value)
-            elif key in _SAMPLER_INPUTS and key not in sampling:
-                sampling[key] = value
-            elif key in _SIZE_INPUTS and key not in size:
-                size[key] = value
+        for key, value in _literal_inputs(node):
+            _classify_input(key, value, found)
+    return found
 
-    return {"models": models, "sampling": sampling, "size": size}
+
+def _literal_inputs(node: Any) -> list[tuple[str, Any]]:
+    """The literal (non-wired) inputs of one node.
+
+    A list value is a wire to another node, not a setting, so it is skipped.
+    """
+    if not isinstance(node, dict):
+        return []
+    inputs = node.get("inputs")
+    if not isinstance(inputs, dict):
+        return []
+    return [(k, v) for k, v in inputs.items() if not isinstance(v, list)]
+
+
+def _classify_input(key: str, value: Any, found: dict[str, Any]) -> None:
+    """File one literal input under models / sampling / size, first wins."""
+    if key in _MODEL_INPUTS and isinstance(value, str):
+        if value not in found["models"]:
+            found["models"].append(value)
+    elif key in _SAMPLER_INPUTS:
+        found["sampling"].setdefault(key, value)
+    elif key in _SIZE_INPUTS:
+        found["size"].setdefault(key, value)
 
 
 def graph_digest(compiled: Mapping[str, Any]) -> str:
@@ -293,16 +301,8 @@ class ComfyUIBackend:
             }
 
         qcode, queue = _http.get_json(f"{self.endpoint}/queue", timeout=self.timeout)
-        if qcode < 400 and isinstance(queue, dict):
-            for key, state in (
-                ("queue_running", STATE_IN_PROGRESS),
-                ("queue_pending", STATE_PENDING),
-            ):
-                for entry in queue.get(key) or []:
-                    if job_id in str(entry):
-                        return {"state": state, "outputs": {}, "error": ""}
-
-        return {"state": STATE_UNKNOWN, "outputs": {}, "error": ""}
+        queued = _queue_state(queue, job_id) if qcode < 400 else None
+        return {"state": queued or STATE_UNKNOWN, "outputs": {}, "error": ""}
 
     # -- fetch ----------------------------------------------------------
 
@@ -386,6 +386,17 @@ class ComfyUIBackend:
                 message=f"ComfyUI refused to cancel job {job_id} (HTTP {code})",
                 remediation=f"it may already have finished; server said: {str(body)[:200]}",
             )
+
+
+def _queue_state(queue: Any, job_id: str) -> str | None:
+    """Whether ``job_id`` is visible in the server's queue, and how."""
+    if not isinstance(queue, dict):
+        return None
+    for key, state in (("queue_running", STATE_IN_PROGRESS), ("queue_pending", STATE_PENDING)):
+        for entry in queue.get(key) or []:
+            if job_id in str(entry):
+                return state
+    return None
 
 
 def _media_items(node_outputs: Mapping[str, Any]) -> list[Mapping[str, Any]]:

@@ -194,7 +194,12 @@ def cmd_overview(args: argparse.Namespace) -> int:
     if json_mode:
         emit_result(payload, json_mode=True)
         return 0
+    emit_result(_overview_text(records), json_mode=False)
+    return 0
 
+
+def _overview_text(records: list[jobs.JobRecord]) -> str:
+    """The human rendering of the job noun's overview."""
     lines = [
         "innereye job — follow up work that outlives the submitting process",
         f"  store:  {jobs.store_dir()} (schema v{jobs.SCHEMA_VERSION})",
@@ -205,8 +210,7 @@ def cmd_overview(args: argparse.Namespace) -> int:
     ]
     for r in records:
         lines.append(f"    {r.id}  {r.state:<12} {r.task}")
-    emit_result("\n".join(lines), json_mode=False)
-    return 0
+    return "\n".join(lines)
 
 
 def cmd_status(args: argparse.Namespace) -> int:

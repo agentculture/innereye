@@ -96,13 +96,15 @@ def test_unmapped_field_is_refused_not_dropped() -> None:
 
 def test_mapping_naming_an_absent_node_is_refused() -> None:
     mapping = GraphMapping(fields={"inputs.prompt": "999.inputs.text"}, output_node="9")
+    recipe = Recipe(task="text_to_image", inputs={"prompt": "x"})
     with pytest.raises(CliError) as exc:
-        compile_recipe(Recipe(task="text_to_image", inputs={"prompt": "x"}), FLUX_GRAPH, mapping)
+        compile_recipe(recipe, FLUX_GRAPH, mapping)
     assert "999" in exc.value.message
 
 
 def test_absent_output_node_is_refused() -> None:
     mapping = GraphMapping(fields={"inputs.prompt": "6.inputs.text"}, output_node="404")
+    recipe = Recipe(task="text_to_image", inputs={"prompt": "x"})
     with pytest.raises(CliError) as exc:
-        compile_recipe(Recipe(task="text_to_image", inputs={"prompt": "x"}), FLUX_GRAPH, mapping)
+        compile_recipe(recipe, FLUX_GRAPH, mapping)
     assert "404" in exc.value.message

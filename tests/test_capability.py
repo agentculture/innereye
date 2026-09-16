@@ -45,7 +45,7 @@ def test_supported_recipe_passes_negotiation() -> None:
 def test_embedding_input_is_refused_never_downgraded() -> None:
     """The load-bearing refusal: no silent fallback to 'the closest text prompt'."""
     recipe = Recipe(task="embedding_to_image", inputs={"embedding": [0.1, 0.2]})
-    backend = _Fake("comfyui", IMAGE_ONLY)
+    backend: _Fake = _Fake("comfyui", IMAGE_ONLY)
     with pytest.raises(CliError) as exc:
         negotiate(recipe, backend)
     assert exc.value.code == 1

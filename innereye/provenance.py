@@ -196,16 +196,7 @@ def write_artifact(
     sidecar = sidecar_path(path)
 
     if not overwrite:
-        for existing in (path, sidecar):
-            if existing.exists():
-                raise CliError(
-                    code=EXIT_USER_ERROR,
-                    message=f"refusing to overwrite {existing}",
-                    remediation=(
-                        "pass --overwrite to replace it, or change the seed or output "
-                        "directory -- overwriting would destroy the earlier result's provenance"
-                    ),
-                )
+        _refuse_if_present(path, sidecar)
 
     # Stage both, then move both into place. Writing the artifact first and the
     # sidecar second leaves a window where a disk-full or I/O error yields an
@@ -216,16 +207,8 @@ def write_artifact(
     tmp_artifact = tmp_sidecar = None
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_artifact = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.")
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        fd, tmp_sidecar = tempfile.mkstemp(dir=str(path.parent), prefix=f".{sidecar.name}.")
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
+        tmp_artifact = _stage(path.parent, path.name, data)
+        tmp_sidecar = _stage(path.parent, sidecar.name, payload)
         os.replace(tmp_sidecar, sidecar)
         tmp_sidecar = None
         os.replace(tmp_artifact, path)
@@ -244,6 +227,34 @@ def write_artifact(
         ) from exc
 
     return path, sidecar
+
+
+def _refuse_if_present(*paths: Path) -> None:
+    """Refuse before writing anything if any target already exists."""
+    for existing in paths:
+        if existing.exists():
+            raise CliError(
+                code=EXIT_USER_ERROR,
+                message=f"refusing to overwrite {existing}",
+                remediation=(
+                    "pass --overwrite to replace it, or change the seed or output "
+                    "directory -- overwriting would destroy the earlier result's provenance"
+                ),
+            )
+
+
+def _stage(directory: Path, name: str, write) -> str:
+    """Write via a temp file in ``directory``; return its path for os.replace."""
+    fd, tmp = tempfile.mkstemp(dir=str(directory), prefix=f".{name}.")
+    with os.fdopen(
+        fd,
+        "wb" if isinstance(write, bytes) else "w",
+        **({} if isinstance(write, bytes) else {"encoding": "utf-8"}),
+    ) as stream:
+        stream.write(write)
+        stream.flush()
+        os.fsync(stream.fileno())
+    return tmp
 
 
 def read_sidecar(artifact: Path) -> dict[str, Any]:

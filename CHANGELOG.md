@@ -57,10 +57,17 @@ findings were valid; none needed pushback.
 - **Preview could be memory-bombed.** `decode_png` caps both pixel count and
   decompressed size, so a small malicious PNG falls back to a described preview
   instead of exhausting the process.
+- **A test asserted nothing.** `test_digest_bytes_is_stable` compared
+  `digest_bytes(b"abc")` to itself, which passes for any implementation. It is
+  now pinned against the real SHA-256 of `abc`, so a changed algorithm fails.
+  (SonarCloud's only bug-severity finding, and it was right.)
 - SonarCloud: merged an implicitly concatenated string, reduced cognitive
-  complexity in `fetch()` and `decode_png()`, replaced duplicated argparse help
-  literals with constants, used `min()` instead of sorting, and split composite
-  assertions and multi-call `pytest.raises` blocks in the test suite.
+  complexity in `fetch()`, `decode_png()`, `describe_graph()`,
+  `_status_via_history()` and `write_artifact()` by extracting named helpers,
+  replaced duplicated argparse help literals with constants, removed an unused
+  parameter, gave `job overview` a single exit, used `min()` instead of
+  sorting, and split composite assertions and multi-call `pytest.raises`
+  blocks across the test suite.
 
 ## [0.11.0] - 2026-09-16
 

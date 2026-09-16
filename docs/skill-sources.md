@@ -32,6 +32,20 @@ declares a culture agent (`culture.yaml`, `backend: claude`), and
 `core.skill_loader` silently skips any `SKILL.md` lacking `type:` — so the field
 is load-bearing, even where guildmaster's upstream copy omits it.
 
+## Outbound — authored here, broadcast from here
+
+One skill is **first-party to innereye**: it is authored and maintained in this
+repo alongside the CLI it drives, and is the *inverse* of everything in the
+table below. guildmaster pulls it **from** innereye and broadcasts it to the
+rest of the mesh; because innereye is upstream for it, it is **never
+re-vendored back** from guildmaster's re-broadcast copy.
+
+| Skill | Origin | Drives | Notes |
+|-------|--------|--------|-------|
+| `innereye` | **innereye (here)** | the `innereye` CLI | Teaches a peer agent to render images/video: the operator-supplied graph+mapping pair, dry-run-by-default, the job lifecycle, provenance and collision safety, the preview ladder, and the honest-refusal contract. `scripts/innereye.sh` resolves the CLI portably (installed binary, else `uv run` inside this checkout) and forwards every verb verbatim. Added 0.11.0, alongside the `render` / `job` verbs themselves. |
+
+## Inbound — vendored from guildmaster and peers
+
 | Skill | Upstream | Origin | Notes | Last synced |
 |-------|----------|--------|-------|-------------|
 | `cicd` | `../guildmaster/.claude/skills/cicd/` | guildmaster | CI/CD lane layered on `devex pr`: the 5 thin scripts (`workflow.sh`, `pr-status.sh`, `pr-reply.sh`, `_resolve-nick.sh`, `portability-lint.sh`) delegate lint/open/read/reply/delta to `devex` and add the `status` / `await` SonarCloud-gating extensions. Consumer-identifying prose (`guildmaster` → `innereye`) adapted in the description + heading; upstream history (`Renamed from pr-review in steward 0.7.0; rebased on devex in 0.12.0`) and env-var literals (`STEWARD_*`) kept verbatim. The PR signature resolves at runtime from `culture.yaml` via `_resolve-nick.sh` (→ `innereye`). Requires `devex` on PATH. | 2026-05-26 (guildmaster 0.6.0) |

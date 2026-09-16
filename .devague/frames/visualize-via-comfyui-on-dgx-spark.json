@@ -4,7 +4,7 @@
   "schema_version": 6,
   "status": "exported",
   "created": "2026-09-15T23:57:24Z",
-  "updated": "2026-09-16T01:26:43Z",
+  "updated": "2026-09-16T02:06:38Z",
   "claims": [
     {
       "id": "c1",
@@ -588,7 +588,7 @@
       "kind": "decision",
       "text": "the acceptance run is gated on real provisioning: ComfyUI v0.33.2 plus tier-1 weights (FLUX.1-dev for image, Wan 2.1 T2V 14B for video) installed on the operator's machine, so both halves of c20 are tested against a live server rather than argued",
       "origin": "user",
-      "status": "proposed",
+      "status": "confirmed",
       "honesty_conditions": [],
       "hard_questions": [],
       "links": [],
@@ -1145,7 +1145,7 @@
       "behavior": "a prompt becomes a visible artifact on disk with provenance beside it",
       "source_text": "innereye render turns a prompt into an actual picture on a DGX Spark: submitted as a job to a local ComfyUI, artifact and provenance JSON on disk, and a preview you can actually see in the terminal.",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o2",
@@ -1154,7 +1154,7 @@
       "behavior": "re-running a recorded provenance reproduces a byte-identical artifact",
       "source_text": "re-running a recorded provenance JSON reproduces a byte-identical artifact in at least 1 repeat run; the dry-run default prints the compiled recipe and resolved backend in under 1 second having spent 0 GPU seconds; and a capability mismatch exits non-zero naming an alternative backend in 100 percent of cases rather than rendering something approximate",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o3",
@@ -1163,7 +1163,7 @@
       "behavior": "both media types render from one recipe compiler in the first slice",
       "source_text": "visualize resolves to the full render path \u2014 recipe, job, artifact on disk, provenance \u2014 and the artifact is an IMAGE OR A VIDEO. Both media types are first-class from the first slice, not image-now-video-later.",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o4",
@@ -1172,7 +1172,7 @@
       "behavior": "a second render on the same path refuses rather than destroying the first result",
       "source_text": "a predictable artifact path is a DESTRUCTIVE path: the spec promises predictable paths and records the seed, so re-running the same recipe with the same seed resolves to the same filename and silently overwrites the earlier artifact and its provenance sidecar \u2014 destroying the very evidence the reproducibility claim depends on. Writes must be collision-safe or refuse to clobber without an explicit flag",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o5",
@@ -1181,7 +1181,7 @@
       "behavior": "all five backend states round-trip through the adapter",
       "source_text": "the spec models jobs on the WRONG ComfyUI API: c10 assumes POST /prompt + `GET /history/<id>` polling, but the pinned v0.33.2 exposes a first-class jobs API \u2014 GET /api/jobs (filterable, sortable, paginated), `GET /api/jobs/{job_id}`, `POST /api/jobs/{job_id}/cancel`, POST /api/jobs/cancel \u2014 whose live status enum is pending, in_progress, completed, failed, CANCELLED (five states; the server's own 400 on an invalid filter enumerates them). /history cannot distinguish queued from running from failed; /api/jobs can. (Verified live on 127.0.0.1:8188.)",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o6",
@@ -1190,7 +1190,7 @@
       "behavior": "the server's node_errors payload is surfaced as the remediation, not reconstructed",
       "source_text": "ComfyUI validates missing weights AT SUBMIT, so innereye must not reimplement it: POST /prompt with a graph naming absent weights returns a structured prompt_outputs_failed_validation with node_errors keyed by node id, giving type value_not_in_list, the input_name, the received_value and the full list of valid values. That is a better error than a client-side /object_info pre-flight could construct. innereye's job is to SURFACE that payload as CliError.remediation, not to duplicate the check. (Verified live against 127.0.0.1:8188 on 2026-09-16.) The guide's two halves still do not match \u2014 setup.sh fetches Z-Image-Turbo while the 8 api graphs need a separate 70-230GB model set \u2014 which is what makes this failure path common enough to matter",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o7",
@@ -1199,7 +1199,7 @@
       "behavior": "POST /upload/image returns a name LoadImage consumes",
       "source_text": "the image-input modality has a working path but needs a second endpoint: wan-image-to-video.api.json node 52 is LoadImage {\"image\": \"input_image.png\"} \u2014 a server-side FILENAME, not bytes, so the ComfyUI adapter must POST /upload/image before /prompt. Any img2img/control/last-frame recipe inherits this two-step submit",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o8",
@@ -1208,7 +1208,7 @@
       "behavior": "--json emits exactly one payload on stdout even with --preview",
       "source_text": "_output.py has no binary and no streaming path: emit_result does a single json.dump or str() to stdout, emit_diagnostic is stderr-only strings. So artifact BYTES never flow through the output layer \u2014 they are written to disk by the verb and emit_result returns paths plus provenance. A --wait mode prints progress via emit_diagnostic and emits exactly one final payload",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o9",
@@ -1217,7 +1217,7 @@
       "behavior": "a job submitted by one process is collectable by another",
       "source_text": "innereye render --prompt TEXT --graph PATH submits a job to a local ComfyUI and returns a handle; innereye job fetch ID writes an image or a video artifact to a predictable path with a provenance JSON beside it; a preview flag draws it inline where the terminal supports it",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o10",
@@ -1226,7 +1226,7 @@
       "behavior": "an embedding recipe is refused naming the shortfall, never approximated",
       "source_text": "none of the 8 playbook graphs exposes an embedding input node \u2014 they are all CLIPTextEncode/LoadImage-fed. The embedding->image modality CLAUDE.md calls 'the reason this repo is worth existing' has NO template to cite from this guide and needs custom nodes (unCLIP / IPAdapter / raw CONDITIONING injection). This guide does not close that gap",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o11",
@@ -1235,7 +1235,7 @@
       "behavior": "a PR publishes <version>.dev<run> to TestPyPI and a merge publishes to PyPI",
       "source_text": "publish.yml is path-filtered to pyproject.toml and innereye/** \u2014 so the very first commit that adds innereye/backends/comfyui.py triggers a REAL TestPyPI upload of `<version>.dev<run_number>` on the PR, and a real PyPI upload on merge. Version numbers are spent on both indexes, irreversibly, from the first adapter commit onward",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o12",
@@ -1244,7 +1244,7 @@
       "behavior": "the adapter works unchanged against a server on another host, reading nothing from the local filesystem",
       "source_text": "the whole frame assumes ComfyUI is LOCAL, but the guide's own launch command binds 0.0.0.0, which exists precisely so the server can be remote. If the server is on another host, the artifact is not on innereye's filesystem at all and /view is the only way to obtain bytes, ComfyUI's model list is the remote machine's not the local one, and c31's pre-submit weight validation must query the server rather than look at a directory",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     },
     {
       "id": "o13",
@@ -1253,7 +1253,7 @@
       "behavior": "cancel stops a queued or running job on a live server",
       "source_text": "the job lifecycle in the spec is happy-path only: submit / status / fetch has no CANCEL and no FAILED terminal state, yet the server exposes POST /interrupt, POST /api/jobs/{id}/cancel and POST /api/jobs/cancel, and JobStatus includes failed. An agent that submits a multi-minute video render and changes its mind, or whose job dies in the sampler, has no verb and no defined exit code",
       "origin": "llm",
-      "status": "proposed"
+      "status": "approved"
     }
   ]
 }

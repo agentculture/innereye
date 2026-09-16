@@ -34,6 +34,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`render --demo <name>`** — a separately named mode that downloads one of
   NVIDIA's dgx-spark-playbook graphs plus a matching field-to-node mapping. The
   ordinary render path never touches the network.
+- **An `innereye` skill — this repo's first outbound skill.** Everything under
+  `.claude/skills/` until now was vendored *inbound* from guildmaster, devague
+  and colleague; `innereye` is authored here alongside the CLI it drives, so a
+  peer agent on the mesh can be taught to render without reading the source.
+  guildmaster pulls it from here and broadcasts it onward.
 - A generic introspection test that walks the registered argparse tree and
   asserts every command has an `explain` catalog entry and its own `--json`.
   Nothing checked this before, so a half-registered verb failed no test.

@@ -52,20 +52,20 @@ Quoted verbatim from the `devague summary` skeleton:
 
 ## Mid-work Decisions
 
-Three deviations were recorded via `/deviate` at the moment each occurred. **All
-three are still `proposed` — none is approved, so none can yet be cited as
-recorded ground truth.** They are listed here as decisions taken, pending the
-user's adjudication:
+Three deviations were recorded via `/deviate` at the moment each occurred, and
+**all three were subsequently approved by the user**. They are the recorded
+ground truth for the Drift section below, consumed here rather than
+re-litigated:
 
-- `d1` (proposed) — the `job` noun group ships no `submit` sub-verb. Reason: a
+- `d1` (approved) — the `job` noun group ships no `submit` sub-verb. Reason: a
   `job submit` would need the entire render surface (`--graph`, `--mapping`,
   `--prompt`, every param) to construct a recipe, duplicating `render` exactly.
   `render --apply` *is* the submit step and already returns a job handle.
-- `d2` (proposed) — `GraphMapping` accepts a **list** of node paths per recipe
+- `d2` (approved) — `GraphMapping` accepts a **list** of node paths per recipe
   field. Reason: `flux-text-to-image` reads the resolution in two nodes
   (`EmptySD3LatentImage` 27 and `ModelSamplingFlux` 30); mapping `width` to only
   one silently mis-shifts the sampler while appearing to work.
-- `d3` (proposed) — `t14` ran **before** `t12`/`t13`, inverting the plan's wave
+- `d3` (approved) — `t14` ran **before** `t12`/`t13`, inverting the plan's wave
   order. Reason: the user's stated goal was to actually generate an image; the
   dependency was PR-hygiene ordering, not a functional prerequisite.
 
@@ -82,9 +82,9 @@ Decisions not covered by any deviation record:
 
 | Plan item | Reason for divergence | Classification |
 |-----------|-----------------------|----------------|
-| `t9` (`d1`, proposed) | Ships `overview`/`status`/`fetch`/`cancel` but no `submit` sub-verb; `render --apply` is the submit step. Two verbs constructing the same recipe would duplicate the whole render surface. | acceptable |
-| `t1` (`d2`, proposed) | `GraphMapping` gained one-field-to-many-paths, which the task's acceptance criteria did not anticipate. Required for a correct flux mapping. | acceptable |
-| `t14` (`d3`, proposed) | Ran ahead of `t12`/`t13`, inverting declared wave order. `t12` and `t13` still completed before this summary. | acceptable |
+| `t9` (`d1`) | Ships `overview`/`status`/`fetch`/`cancel` but no `submit` sub-verb; `render --apply` is the submit step. Two verbs constructing the same recipe would duplicate the whole render surface. | acceptable |
+| `t1` (`d2`) | `GraphMapping` gained one-field-to-many-paths, which the task's acceptance criteria did not anticipate. Required for a correct flux mapping. | acceptable |
+| `t14` (`d3`) | Ran ahead of `t12`/`t13`, inverting declared wave order. `t12` and `t13` still completed before this summary. | acceptable |
 | `c31` (claim, amended mid-run) | The claim originally required a client-side `/object_info` pre-flight of a graph's weights. The live probe showed ComfyUI already fails closed at submit with a richer `node_errors` payload, so the claim was amended and the pre-flight removed. | acceptable |
 | `c34` (claim, amended mid-run) | The status enum was recorded as four states from a source grep; the running server enumerated **five** (`cancelled` included). Amended against the live server. | acceptable |
 
@@ -108,7 +108,8 @@ Decisions not covered by any deviation record:
   and `/home/spark/comfy/renders/864e333bea05_wan_t2v_output_00001_.webp` (137 488 B, 17 ANMF frames)
 - reproduction: both runs of seed `20260916` hashed `ed356ab1c787a04fc47896d0445bb10352c79214e5789d209b309c7a23876f4d`
 - commits: `a909f9e..5356904`
-- devague: obligations `o1`–`o13`, evidence `e1`–`e10` (all `proposed`), deltas `b1`–`b3` (all `proposed`)
+- devague: obligations `o1`–`o13`, evidence `e1`–`e10` (all `proposed`), deltas `b1`–`b6` (all `proposed`)
+- devague: deviations `d1`, `d2`, `d3` — **approved**
 
 Lapse ledger evidence:
 
@@ -145,12 +146,10 @@ live run then found.
 
 ## Remaining Work / Follow-up
 
-- **Adjudicate `d1`, `d2`, `d3`** — all three deviations are `proposed`. Until
-  approved they are not recorded ground truth, and two behavioral deltas
-  (`job submit` removal, multi-path mapping) were **refused by the CLI** for
-  exactly that reason. Owner: the user.
-- **Adjudicate obligations/evidence `o1`–`o13`, `e1`–`e10`, deltas `b1`–`b3`** —
-  all `llm`-origin and therefore `proposed`. Owner: the user.
+- **Adjudicate obligations/evidence `o1`–`o13`, `e1`–`e10`, deltas `b1`–`b6`** —
+  all `llm`-origin and therefore `proposed`. Owner: the user. (Deviations `d1`,
+  `d2`, `d3` were approved, which unblocked deltas `b4`–`b6`; those three had
+  been refused by the CLI while their deviations were still proposed.)
 - **`o13` — live cancel.** Exercise `innereye job cancel` against a genuinely
   in-flight job (a long Wan render is the natural candidate).
 - **`o12` — remote backend.** Run the adapter against a ComfyUI on another host
@@ -169,7 +168,3 @@ live run then found.
 - **Per-step progress for `--wait`.** ComfyUI exposes it only over a websocket,
   which the stdlib-only rule makes expensive; polling gives state transitions
   but not progress (plan risk `r3`, frame park `v6`).
-- **Stray repo artifact.** `/recall` wrote
-  `.eidetic/memory/culture-agent-template__public.jsonl` into the working tree —
-  a *public*, `culture-agent-template`-scoped record. Left uncommitted
-  deliberately; decide whether to delete it or re-scope it.

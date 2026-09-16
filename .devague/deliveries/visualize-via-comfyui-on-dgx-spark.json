@@ -2,7 +2,7 @@
   "plan_slug": "visualize-via-comfyui-on-dgx-spark",
   "schema_version": 2,
   "created": "2026-09-16T00:50:28Z",
-  "updated": "2026-09-16T01:00:03Z",
+  "updated": "2026-09-16T01:07:28Z",
   "deviations": [
     {
       "id": "d1",
@@ -14,7 +14,7 @@
         "c12"
       ],
       "origin": "llm",
-      "status": "proposed",
+      "status": "approved",
       "classification": "acceptable",
       "seq": 1
     },
@@ -27,7 +27,7 @@
         "t8"
       ],
       "origin": "llm",
-      "status": "proposed",
+      "status": "approved",
       "classification": "acceptable",
       "seq": 2
     },
@@ -41,7 +41,7 @@
         "t13"
       ],
       "origin": "llm",
-      "status": "proposed",
+      "status": "approved",
       "classification": "acceptable",
       "seq": 3
     }
@@ -277,6 +277,42 @@
       "evidence_refs": [
         "e6"
       ],
+      "origin": "llm",
+      "status": "proposed",
+      "superseded": false
+    },
+    {
+      "id": "b4",
+      "kind": "removed",
+      "behavior_text": "the job noun group ships no 'submit' sub-verb; 'innereye render --apply' is the submit step and returns the job handle. Two verbs constructing the same recipe would duplicate the entire render surface (--graph, --mapping, --prompt, every param).",
+      "caused_by": [
+        "d1"
+      ],
+      "evidence_refs": [],
+      "origin": "llm",
+      "status": "proposed",
+      "superseded": false
+    },
+    {
+      "id": "b5",
+      "kind": "added",
+      "behavior_text": "GraphMapping accepts a LIST of node input paths per recipe field, not only one. flux-text-to-image reads the resolution in both EmptySD3LatentImage (27) and ModelSamplingFlux (30); mapping width to only one silently mis-shifts the sampler while appearing to work.",
+      "caused_by": [
+        "d2"
+      ],
+      "evidence_refs": [],
+      "origin": "llm",
+      "status": "proposed",
+      "superseded": false
+    },
+    {
+      "id": "b6",
+      "kind": "amended",
+      "behavior_text": "t14 (live acceptance) executed before t12 (prose sweep) and t13 (version bump), inverting the plan's declared wave order; t12 and t13 still completed before the delivery summary was written.",
+      "caused_by": [
+        "d3"
+      ],
+      "evidence_refs": [],
       "origin": "llm",
       "status": "proposed",
       "superseded": false
